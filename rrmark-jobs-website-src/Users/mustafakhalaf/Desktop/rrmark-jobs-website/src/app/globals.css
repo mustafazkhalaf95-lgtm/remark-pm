@@ -1,0 +1,240 @@
+/* San Francisco is Apple's system font — referenced via system font stack */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-[#080816] text-white font-sans antialiased;
+    min-height: 100vh;
+  }
+
+  /* Apply SF Arabic when page is in RTL/Arabic mode */
+  [dir="rtl"] body {
+    font-family: "SF Arabic", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(139, 92, 246, 0.4);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.7);
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/[0.06] backdrop-blur-xl border border-white/[0.12] shadow-glass;
+  }
+
+  .glass-hover {
+    @apply hover:bg-white/[0.10] hover:border-white/[0.2] hover:shadow-glass-hover transition-all duration-300;
+  }
+
+  .input-glass {
+    @apply w-full px-4 py-3 bg-white/[0.07] border border-white/[0.15] rounded-2xl text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/40 backdrop-blur-sm transition-all duration-200;
+  }
+
+  .label-glass {
+    @apply block text-sm font-medium text-white/70 mb-1.5;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-gradient-to-r from-violet-400 via-pink-400 to-blue-400 bg-clip-text text-transparent;
+  }
+
+  .border-gradient {
+    border-image: linear-gradient(135deg, rgba(139, 92, 246, 0.6), rgba(59, 130, 246, 0.3)) 1;
+  }
+}
+
+/* Crystal prism effect */
+@keyframes prism-rotate {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+
+  50% {
+    transform: rotate(180deg) scale(1.05);
+  }
+
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes prism-glow {
+
+  0%,
+  100% {
+    opacity: 0.15;
+    filter: blur(40px);
+  }
+
+  50% {
+    opacity: 0.25;
+    filter: blur(50px);
+  }
+}
+
+.crystal-prism {
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  background:
+    conic-gradient(from 0deg,
+      rgba(139, 92, 246, 0.4),
+      rgba(59, 130, 246, 0.3),
+      rgba(236, 72, 153, 0.25),
+      rgba(6, 182, 212, 0.3),
+      rgba(139, 92, 246, 0.4));
+  clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+  animation: spin-border 10s linear infinite;
+  pointer-events: none;
+}
+
+.crystal-glow {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle,
+      rgba(139, 92, 246, 0.2) 0%,
+      rgba(59, 130, 246, 0.1) 40%,
+      transparent 70%);
+  animation: prism-glow 6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Crystal Orb component animations ── */
+@keyframes crystal-cell-shimmer {
+
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes crystal-sparkle-twinkle {
+
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
+.crystal-cell {
+  animation: crystal-cell-shimmer 4s ease-in-out infinite;
+}
+
+.crystal-sparkle {
+  animation: crystal-sparkle-twinkle 3s ease-in-out infinite;
+}
+
+@keyframes crystal-outer-pulse {
+
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1.45);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.55);
+  }
+}
+
+/* ── Crystal spin glow ring ── */
+@keyframes crystal-spin-glow {
+  0% {
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.1), inset 0 0 20px rgba(47, 107, 255, 0.05);
+  }
+
+  100% {
+    box-shadow: 0 0 30px rgba(47, 107, 255, 0.15), inset 0 0 25px rgba(124, 58, 237, 0.08);
+  }
+}
+
+/* ── Floating Assistant ── */
+@keyframes assistant-pulse-glow {
+
+  0%,
+  100% {
+    box-shadow: 0 4px 24px rgba(47, 107, 255, 0.25), 0 0 40px rgba(124, 58, 237, 0.10);
+  }
+
+  50% {
+    box-shadow: 0 4px 32px rgba(47, 107, 255, 0.40), 0 0 50px rgba(124, 58, 237, 0.18);
+  }
+}
+
+.assistant-pulse {
+  animation: assistant-pulse-glow 3s ease-in-out infinite;
+}
+
+@keyframes typing-bounce {
+
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 0.9;
+  }
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(47, 107, 255, 0.7);
+  display: inline-block;
+  animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+/* Chat scrollbar */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(47, 107, 255, 0.2);
+  border-radius: 2px;
+}

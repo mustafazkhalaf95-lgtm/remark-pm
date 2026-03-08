@@ -8,6 +8,11 @@ export async function PUT(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const userRole = (session.user as any).role;
+    if (userRole !== 'CEO' && userRole !== 'COO' && userRole !== 'CREATIVE_MANAGER' && userRole !== 'PRODUCTION_MANAGER') {
+        return NextResponse.json({ error: 'Insufficient permissions to modify field values' }, { status: 403 });
+    }
+
     try {
         const { cardId, fieldId, value } = await request.json();
         if (!cardId || !fieldId) return NextResponse.json({ error: 'cardId, fieldId required' }, { status: 400 });
@@ -31,6 +36,7 @@ export async function PUT(request: Request) {
             return NextResponse.json(created, { status: 201 });
         }
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('[Admin Fields Values PUT]', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

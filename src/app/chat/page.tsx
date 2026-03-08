@@ -129,8 +129,18 @@ export default function ChatPage() {
         if (e.key === 'Enter') sendMessage();
     };
 
+    const escapeHtml = (text: string) => {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    };
+
     const formatMessageContent = (content: string) => {
-        return content.replace(/@(\w+)/g, '<span class="text-violet-400 font-bold bg-violet-500/10 px-1 rounded">@$1</span>');
+        const escaped = escapeHtml(content);
+        return escaped.replace(/@(\w+)/g, '<span class="text-violet-400 font-bold bg-violet-500/10 px-1 rounded">@$1</span>');
     };
 
     const formatTime = (date: string) => {

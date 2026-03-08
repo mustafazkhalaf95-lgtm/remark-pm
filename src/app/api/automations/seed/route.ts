@@ -132,7 +132,7 @@ export async function POST(request: Request) {
     await prisma.automationRule.deleteMany({ where: { workspaceId } });
 
     // Create new rules
-    const created = [];
+    const created: any[] = [];
     for (const rule of rules) {
         // Filter out actions with undefined boardIds
         const validActions = rule.actions.filter(a => {

@@ -54,7 +54,7 @@ export default function FloatingAssistant() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [typing, setTyping] = useState(false);
-    const bubbleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const bubbleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const endRef = useRef<HTMLDivElement>(null);
     const idRef = useRef(0);
     const [mounted, setMounted] = useState(false);

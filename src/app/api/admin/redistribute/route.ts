@@ -8,6 +8,11 @@ export async function POST(request: Request) {
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const userRole = (session.user as any).role;
+    if (userRole !== 'CEO' && userRole !== 'COO') {
+        return NextResponse.json({ error: 'Only CEO/COO can redistribute cards' }, { status: 403 });
+    }
+
     const userId = (session.user as any).id;
     const wm = await prisma.workspaceMember.findFirst({ where: { userId } });
     if (!wm) return NextResponse.json({ error: 'No workspace' }, { status: 400 });

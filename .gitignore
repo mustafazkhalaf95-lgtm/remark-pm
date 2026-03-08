@@ -30,8 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files (use .env.example as template)
+.env
+.env*.local
 
 # vercel
 .vercel
@@ -39,3 +40,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+*.db
+*.db-journal
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# debug/temp files
+dom-dump.txt
+playwright-*.js
+playwright-*.png
+test-*.js
+
+# Gemini/Antigravity
+.gemini/
+.agents/

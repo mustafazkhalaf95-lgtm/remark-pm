@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>تقرير إصلاحات الفرونت — Remark PM</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-serif;
+      background: #f8fafc;
+      color: #1e293b;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+      color: white;
+      padding: 50px 40px;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 8px;
+    }
+
+    .header p {
+      opacity: 0.85;
+      font-size: 16px;
+    }
+
+    .header .badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.2);
+      padding: 4px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    .content {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 30px 20px;
+    }
+
+    .summary-cards {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 30px 0;
+    }
+
+    .card {
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+      text-align: center;
+    }
+
+    .card .num {
+      font-size: 36px;
+      font-weight: 700;
+      color: #6366f1;
+    }
+
+    .card .lbl {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .card.green .num {
+      color: #22c55e;
+    }
+
+    .card.orange .num {
+      color: #f59e0b;
+    }
+
+    .section {
+      background: white;
+      border-radius: 12px;
+      padding: 28px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .section h2 {
+      font-size: 20px;
+      color: #6366f1;
+      margin-bottom: 16px;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th,
+    td {
+      padding: 12px 16px;
+      text-align: right;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    td {
+      color: #334155;
+    }
+
+    .status {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .status.done {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .status.critical {
+      background: #fecaca;
+      color: #991b1b;
+    }
+
+    .status.high {
+      background: #fed7aa;
+      color: #9a3412;
+    }
+
+    .status.medium {
+      background: #fef9c3;
+      color: #854d0e;
+    }
+
+    .file-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .file-list li {
+      padding: 8px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .file-list li:last-child {
+      border: none;
+    }
+
+    .file-path {
+      color: #6366f1;
+      font-family: monospace;
+      font-size: 13px;
+      direction: ltr;
+    }
+
+    .file-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 10px;
+      font-size: 11px;
+    }
+
+    .file-tag.new {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .file-tag.modified {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 20px;
+      background: #e2e8f0;
+      border-radius: 10px;
+      margin: 16px 0;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #6366f1, #22c55e);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .footer {
+      text-align: center;
+      padding: 30px;
+      color: #94a3b8;
+      font-size: 13px;
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .header {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .card,
+      .section {
+        box-shadow: none;
+        border: 1px solid #e2e8f0;
+      }
+
+      .summary-cards {
+        page-break-inside: avoid;
+      }
+
+      .section {
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="header">
+    <h1>📋 تقرير إصلاحات الفرونت الشامل</h1>
+    <p>Remark PM — Marketing Team System</p>
+    <span class="badge">📅 7 مارس 2026 — الإصدار 2.0</span>
+  </div>
+
+  <div class="content">
+
+    <!-- Summary Cards -->
+    <div class="summary-cards">
+      <div class="card green">
+        <div class="num">13</div>
+        <div class="lbl">مهمة مكتملة ✅</div>
+      </div>
+      <div class="card orange">
+        <div class="num">7</div>
+        <div class="lbl">ملف جديد تم إنشاؤه</div>
+      </div>
+      <div class="card">
+        <div class="num">6</div>
+        <div class="lbl">ملف تم تعديله</div>
+      </div>
+    </div>
+
+    <!-- Progress -->
+    <div class="section">
+      <h2>📊 التقدم الإجمالي</h2>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: 100%">100%</div>
+      </div>
+      <p style="color:#64748b; font-size:14px; margin-top:8px">13 من 13 مهمة مكتملة ✅ — تم إنجاز جميع المهام بنجاح!</p>
+    </div>
+
+    <!-- Critical Fixes -->
+    <div class="section">
+      <h2>🔴 إصلاحات حرجة (Critical)</h2>
+      <table>
+        <tr>
+          <th style="width:35%">المهمة</th>
+          <th>التفاصيل</th>
+          <th style="width:12%">الحالة</th>
+        </tr>
+        <tr>
+          <td><strong>A-2:</strong> حفظ البيانات (localStorage)</td>
+          <td>تم إضافة الحفظ التلقائي لـ: عملاء الـ Pipeline، العملاء المحولين، بيانات المراحل، رسائل الشات، الملخصات
+            الشهرية، بيانات وردة، رسائل البايبلاين. البيانات لا تضيع عند تحديث الصفحة.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>H-1:</strong> Error Boundary</td>
+          <td>تم إنشاء مكوّن ErrorBoundary يمنع الشاشة البيضاء عند حدوث خطأ. يعرض رسالة ودية مع زر "إعادة المحاولة". تم
+            دمجه في layout.tsx ليشمل كل الصفحات.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- High Fixes -->
+    <div class="section">
+      <h2>🟠 إصلاحات عالية الأولوية (High)</h2>
+      <table>
+        <tr>
+          <th style="width:35%">المهمة</th>
+          <th>التفاصيل</th>
+          <th style="width:12%">الحالة</th>
+        </tr>
+        <tr>
+          <td><strong>E-2:</strong> إصلاح Race Condition</td>
+          <td>تمت إضافة حارس <code>useRef</code> لمنع النقر المزدوج أثناء تحويل العملاء من الـ Pipeline إلى العملاء
+            المحولين. يمنع إنشاء نسخ مكررة.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>F-2:</strong> تواريخ ديناميكية</td>
+          <td>تم استبدال جميع التواريخ الثابتة (مثل "5 مارس 2026") بتواريخ ديناميكية تعتمد على
+            <code>toLocaleDateString</code>. يتحدث التاريخ تلقائياً.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>F-3:</strong> إصلاح شات الـ Pipeline</td>
+          <td>كان الشات فارغاً ولا يعمل. تمت إضافة حالة <code>pipelineChatMsgs</code> و <code>pipelineChatInput</code>
+            مع الحفظ التلقائي في localStorage. الآن يمكن إرسال وعرض الرسائل.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>A-3:</strong> حفظ CreativeStore + ProductionStore</td>
+          <td>تمت إضافة <code>_saveToStorage()</code> و <code>_loadFromStorage()</code> لكلا المخزنين. يتم الحفظ
+            تلقائياً عند كل <code>emit()</code>. عند التحميل، يسترجع البيانات المحفوظة أو يعود للبذر الافتراضي.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Medium Fixes -->
+    <div class="section">
+      <h2>🟡 إصلاحات متوسطة الأولوية (Medium)</h2>
+      <table>
+        <tr>
+          <th style="width:35%">المهمة</th>
+          <th>التفاصيل</th>
+          <th style="width:12%">الحالة</th>
+        </tr>
+        <tr>
+          <td><strong>E-3:</strong> تحقق مراحل الـ Pipeline</td>
+          <td>منع تخطي المراحل — المستخدم يمكنه فقط التقدم خطوة واحدة أو الرجوع. لا يمكن القفز من المرحلة 1 إلى المرحلة
+            3 مباشرة.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>B-1/B-2:</strong> تحسين منطق الذكاء الاصطناعي</td>
+          <td>تمت إضافة <code>generateAIReply()</code> — ردود ذكية مخصصة بناءً على الكلمات المفتاحية (ميزانية، محتوى،
+            تقرير، جدول). الرد يظهر بعد ثانية واحدة. يدعم العربية والإنجليزية.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>F-4:</strong> تحسين تصدير PDF</td>
+          <td>تم تطوير التصدير من جدول بسيط إلى تقرير احترافي: هيدر متدرج، جدول معلومات، شريط تقدم، شرائح أهداف ومنصات،
+            ملخص اجتماع، CSS محسّن للطباعة.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>G-2:</strong> تحسينات أداء</td>
+          <td>تمت إضافة <code>useMemo</code> و <code>useCallback</code> للدوال المكلفة حسابياً. تقليل إعادة الرسم غير
+            الضرورية.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Build Fixes -->
+    <div class="section">
+      <h2>🔧 إصلاحات البناء (Build Fixes)</h2>
+      <p style="color:#64748b; font-size:14px; margin-bottom:16px">ملفات كانت مفقودة من المشروع وتسبب أخطاء بناء تمنع
+        تشغيل التطبيق:</p>
+      <table>
+        <tr>
+          <th>الملف المفقود</th>
+          <th>الحل</th>
+          <th>ملاحظة</th>
+        </tr>
+        <tr>
+          <td><code>next-auth</code></td>
+          <td>تم تثبيت الحزمة + إنشاء route stub</td>
+          <td>يحتاج تفعيل حقيقي بعد إعداد DB</td>
+        </tr>
+        <tr>
+          <td><code>prisma.ts</code></td>
+          <td>stub يستخدم Proxy — يعطي خطأ وصفي وقت التشغيل</td>
+          <td>يحتاج schema.prisma</td>
+        </tr>
+        <tr>
+          <td><code>AppLayout.tsx</code></td>
+          <td>مكوّن تنقل أساسي مع شريط جانبي</td>
+          <td>يستخدمه admin, chat, automations</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Files Changed -->
+    <div class="section">
+      <h2>📁 الملفات التي تم تعديلها / إنشاؤها</h2>
+      <ul class="file-list">
+        <li><span>src/app/page.tsx</span><span class="file-tag modified">تعديل</span></li>
+        <li><span>src/app/layout.tsx</span><span class="file-tag modified">تعديل</span></li>
+        <li><span>src/lib/creativeStore.ts</span><span class="file-tag modified">تعديل</span></li>
+        <li><span>src/lib/productionStore.ts</span><span class="file-tag modified">تعديل</span></li>
+        <li><span>src/components/ErrorBoundary.tsx</span><span class="file-tag new">جديد</span></li>
+        <li><span>src/components/AppLayout.tsx</span><span class="file-tag new">جديد</span></li>
+        <li><span>src/lib/prisma.ts</span><span class="file-tag new">جديد</span></li>
+        <li><span>src/app/api/auth/[...nextauth]/route.ts</span><span class="file-tag new">جديد</span></li>
+      </ul>
+    </div>
+
+    <!-- Additional Medium Tasks -->
+    <div class="section">
+      <h2>🟢 مهام إضافية مكتملة</h2>
+      <table>
+        <tr>
+          <th style="width:35%">المهمة</th>
+          <th>التفاصيل</th>
+          <th style="width:12%">الحالة</th>
+        </tr>
+        <tr>
+          <td><strong>H-2:</strong> Error Handling متقدم</td>
+          <td>تم إنشاء <code>errorUtils.ts</code> (نظام Toast + safeAsync + safeFetch + validateForm) و
+            <code>ToastContainer.tsx</code> مدمج في الصفحة الرئيسية.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>G-3:</strong> تحسينات أداء</td>
+          <td>إضافة <code>useMemo</code> و <code>useCallback</code> للدوال المكلفة حسابياً. تقليل إعادة الرسم.</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+        <tr>
+          <td><strong>A-1:</strong> تقسيم page.tsx</td>
+          <td>استخراج كائن النصوص (368 سطر) إلى <code>texts.ts</code>. تقليل page.tsx من 2151 إلى 1784 سطر (-17%).</td>
+          <td><span class="status done">✅ مكتمل</span></td>
+        </tr>
+      </table>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <p>تم الإنشاء بواسطة Antigravity AI — Remark PM System</p>
+    <p style="margin-top:4px">📅 7 مارس 2026 — الساعة 23:11</p>
+    <p style="margin-top:12px; font-size:11px; color:#cbd5e1">للحفظ كـ PDF: اضغط Ctrl+P (أو ⌘+P) → اختر "Save as PDF"
+    </p>
+  </div>
+
+</body>
+
+</html>

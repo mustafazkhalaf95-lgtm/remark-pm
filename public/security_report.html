@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تقرير الأمان والباك اند — Abdullah Jabar | Remark PM</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-serif;
+            background: #fff;
+            color: #1e293b;
+            line-height: 1.6;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #dc2626 0%, #991b1b 50%, #7f1d1d 100%);
+            color: white;
+            padding: 50px 40px;
+        }
+
+        .header h1 {
+            font-size: 30px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.85;
+            font-size: 15px;
+        }
+
+        .header .badge {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 4px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        .header .meta {
+            display: flex;
+            gap: 24px;
+            margin-top: 16px;
+            font-size: 13px;
+            opacity: 0.8;
+        }
+
+        .content {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 30px 20px;
+        }
+
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+            margin: 24px 0;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            text-align: center;
+            border: 1px solid #f1f5f9;
+        }
+
+        .card .num {
+            font-size: 32px;
+            font-weight: 700;
+        }
+
+        .card .lbl {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .card.red .num {
+            color: #dc2626;
+        }
+
+        .card.orange .num {
+            color: #f59e0b;
+        }
+
+        .card.green .num {
+            color: #22c55e;
+        }
+
+        .card.blue .num {
+            color: #6366f1;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 18px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+            border: 1px solid #f1f5f9;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            color: #dc2626;
+            margin-bottom: 14px;
+            border-bottom: 2px solid #fecaca;
+            padding-bottom: 8px;
+        }
+
+        .section.done h2 {
+            color: #22c55e;
+            border-bottom-color: #dcfce7;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th,
+        td {
+            padding: 10px 14px;
+            text-align: right;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        th {
+            background: #fafafa;
+            color: #475569;
+            font-weight: 600;
+        }
+
+        td {
+            color: #334155;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status.done {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status.critical {
+            background: #fecaca;
+            color: #991b1b;
+        }
+
+        .status.high {
+            background: #fed7aa;
+            color: #9a3412;
+        }
+
+        .status.partial {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .finding {
+            background: #fafafa;
+            border-radius: 8px;
+            padding: 14px;
+            margin: 10px 0;
+            border-right: 4px solid #dc2626;
+        }
+
+        .finding.high {
+            border-right-color: #f59e0b;
+        }
+
+        .finding.done {
+            border-right-color: #22c55e;
+            background: #f0fdf4;
+        }
+
+        .finding h4 {
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+
+        .finding p {
+            font-size: 13px;
+            color: #475569;
+        }
+
+        code {
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+            direction: ltr;
+            display: inline-block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 16px;
+            background: #fee2e2;
+            border-radius: 8px;
+            margin: 12px 0;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .progress-fill.green {
+            background: linear-gradient(90deg, #22c55e, #16a34a);
+        }
+
+        .progress-fill.orange {
+            background: linear-gradient(90deg, #f59e0b, #ea580c);
+        }
+
+        .verdict-box {
+            background: linear-gradient(135deg, #fef2f2, #fff1f2);
+            border: 2px solid #fecaca;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .verdict-box h3 {
+            font-size: 22px;
+            color: #dc2626;
+            margin-bottom: 8px;
+        }
+
+        .verdict-box p {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin: 16px 0;
+        }
+
+        .score-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px;
+            background: #fafafa;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .score-val {
+            font-weight: 700;
+        }
+
+        .score-val.red {
+            color: #dc2626;
+        }
+
+        .score-val.orange {
+            color: #f59e0b;
+        }
+
+        .score-val.green {
+            color: #22c55e;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: #94a3b8;
+            font-size: 13px;
+            border-top: 1px solid #e2e8f0;
+            margin-top: 30px;
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            .header {
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+
+            .card,
+            .section {
+                box-shadow: none;
+            }
+
+            .section {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <h1>🔒 تقرير الأمان والباك اند — Remark PM</h1>
+        <p>Security & Backend Audit & Remediation Report</p>
+        <div class="meta">
+            <span>👤 المطور: عبدالله جبار (Abdullah Jabar)</span>
+            <span>📅 التاريخ: 8 مارس 2026</span>
+            <span>🏢 المشروع: Remark PM v1.0</span>
+        </div>
+        <span class="badge">🔍 تدقيق شامل + إصلاحات</span>
+    </div>
+
+    <div class="content">
+
+        <!-- Summary Cards -->
+        <div class="summary-cards">
+            <div class="card red">
+                <div class="num">28</div>
+                <div class="lbl">ثغرة تم اكتشافها</div>
+            </div>
+            <div class="card green">
+                <div class="num">13</div>
+                <div class="lbl">مهمة تم إصلاحها ✅</div>
+            </div>
+            <div class="card orange">
+                <div class="num">11</div>
+                <div class="lbl">مهمة باك اند متبقية</div>
+            </div>
+            <div class="card blue">
+                <div class="num">2.1</div>
+                <div class="lbl">التقييم الأولي /10</div>
+            </div>
+        </div>
+
+        <!-- Original Audit Verdict -->
+        <div class="verdict-box">
+            <h3>⛔ الحالة قبل الإصلاحات: غير جاهز للإنتاج</h3>
+            <p>تم اكتشاف 28 ثغرة: 4 حرجة، 8 عالية، 10 متوسطة، 6 منخفضة — أبرزها ثغرة SQL Injection تسمح بالتحكم الكامل
+                بقاعدة البيانات</p>
+        </div>
+
+        <!-- Score Before -->
+        <div class="section">
+            <h2>📊 التقييم الأولي للنظام</h2>
+            <div class="score-grid">
+                <div class="score-item"><span>🔐 الأمان</span><span class="score-val red">2/10</span></div>
+                <div class="score-item"><span>💾 سلامة البيانات</span><span class="score-val red">1/10</span></div>
+                <div class="score-item"><span>🏗️ الهندسة المعمارية</span><span class="score-val orange">3/10</span>
+                </div>
+                <div class="score-item"><span>📝 جودة الكود</span><span class="score-val orange">3/10</span></div>
+                <div class="score-item"><span>🤖 منطق الذكاء الاصطناعي</span><span class="score-val red">2/10</span>
+                </div>
+                <div class="score-item"><span>🎨 تجربة المستخدم</span><span class="score-val orange">5/10</span></div>
+                <div class="score-item"><span>🧪 التغطية الاختبارية</span><span class="score-val red">0/10</span></div>
+                <div class="score-item"><span>📡 المراقبة والتشغيل</span><span class="score-val red">1/10</span></div>
+            </div>
+        </div>
+
+        <!-- Critical Findings -->
+        <div class="section">
+            <h2>🔴 الثغرات الحرجة المكتشفة (Critical)</h2>
+            <div class="finding">
+                <h4>C-1: ثغرة SQL Injection — تنفيذ أوامر SQL مباشرة</h4>
+                <p>ملف <code>admin/sql/route.ts</code> يستخدم <code>$queryRawUnsafe</code> و
+                    <code>$executeRawUnsafe</code> مما يسمح بتنفيذ أي أمر SQL مباشرة — بما فيها حذف الجداول وسرقة
+                    البيانات.</p>
+            </div>
+            <div class="finding">
+                <h4>C-2: كلمة مرور مكشوفة في Git — <code>remark2026</code></h4>
+                <p>جميع الـ 12 حساب يتشاركون نفس كلمة المرور <code>remark2026</code> مكتوبة مباشرة في
+                    <code>prisma/seed.ts</code> ومحفوظة في تاريخ Git.</p>
+            </div>
+            <div class="finding">
+                <h4>C-3: لا يوجد تحقق هوية على الصفحات الرئيسية</h4>
+                <p>صفحات التسويق والإبداع والإنتاج بدون أي مصادقة — أي شخص يعرف الرابط يقدر يوصل لكل البيانات.</p>
+            </div>
+            <div class="finding">
+                <h4>A-2/A-3: فقدان البيانات عند تحديث الصفحة</h4>
+                <p>جميع بيانات العملاء والشات والمراحل محفوظة في ذاكرة المتصفح فقط — تضيع عند الـ refresh.</p>
+            </div>
+        </div>
+
+        <!-- Completed Frontend Tasks -->
+        <div class="section done">
+            <h2>✅ المهام المكتملة — إصلاحات الفرونت (13 مهمة)</h2>
+            <table>
+                <tr>
+                    <th>المهمة</th>
+                    <th>التفاصيل</th>
+                    <th>الحالة</th>
+                </tr>
+                <tr>
+                    <td><strong>A-2:</strong> localStorage Persistence</td>
+                    <td>حفظ تلقائي لجميع بيانات الـ Pipeline والعملاء والشات في localStorage</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>H-1:</strong> Error Boundary</td>
+                    <td>مكوّن ErrorBoundary يمنع الشاشة البيضاء + زر إعادة المحاولة</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>E-2:</strong> Race Condition Fix</td>
+                    <td>حارس <code>useRef</code> لمنع النقر المزدوج عند تحويل العملاء</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>F-2:</strong> Dynamic Dates</td>
+                    <td>استبدال التواريخ الثابتة بـ <code>toLocaleDateString</code></td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>F-3:</strong> Pipeline Chat</td>
+                    <td>إصلاح الشات الفارغ + إضافة إرسال وعرض الرسائل</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>A-3:</strong> Store Persistence</td>
+                    <td>localStorage لـ CreativeStore و ProductionStore</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>E-3:</strong> Pipeline Validation</td>
+                    <td>منع تخطي مراحل الـ Pipeline — تقدم متسلسل فقط</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>B-1/B-2:</strong> AI Chat</td>
+                    <td>ردود ذكية مخصصة حسب الكلمات المفتاحية (عربي + إنجليزي)</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>F-4:</strong> PDF Export</td>
+                    <td>تصدير احترافي: هيدر متدرج + جدول + شريط تقدم</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>G-2:</strong> Performance</td>
+                    <td>إضافة <code>useMemo</code> و <code>useCallback</code></td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>H-2:</strong> Error Handling</td>
+                    <td><code>errorUtils.ts</code> (Toast + safeAsync + safeFetch + validateForm)</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>A-1:</strong> Component Split</td>
+                    <td>استخراج texts (368 سطر) → <code>texts.ts</code> — تقليل 17%</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Build Fixes:</strong></td>
+                    <td>إصلاح middleware + health route + إنشاء stubs</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Backend Security Setup -->
+        <div class="section done">
+            <h2>✅ إعدادات الأمان المنجزة</h2>
+            <table>
+                <tr>
+                    <th>المهمة</th>
+                    <th>التفاصيل</th>
+                    <th>الحالة</th>
+                </tr>
+                <tr>
+                    <td><strong>C-3:</strong> Middleware</td>
+                    <td>إنشاء <code>middleware.ts</code> مع حماية CSRF + Rate Limiting + Auth Check (مؤقتاً معطل لحين
+                        إعداد NextAuth)</td>
+                    <td><span class="status partial">🔵 مُعد</span></td>
+                </tr>
+                <tr>
+                    <td><strong>C-4:</strong> CSRF Protection</td>
+                    <td>التحقق من Origin header على POST/PUT/DELETE — مكتوب في middleware</td>
+                    <td><span class="status partial">🔵 مُعد</span></td>
+                </tr>
+                <tr>
+                    <td><strong>C-5:</strong> Rate Limiting</td>
+                    <td>حد 100 req/min للـ API + 5 req/min لتسجيل الدخول — مكتوب في middleware</td>
+                    <td><span class="status partial">🔵 مُعد</span></td>
+                </tr>
+                <tr>
+                    <td><strong>H-3:</strong> Health Check</td>
+                    <td><code>GET /api/health</code> — يرجع status, uptime, timestamp, version</td>
+                    <td><span class="status done">✅</span></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Remaining Backend Tasks -->
+        <div class="section">
+            <h2>⏳ مهام الباك اند المتبقية (Developer 1)</h2>
+            <table>
+                <tr>
+                    <th>المهمة</th>
+                    <th>الأولوية</th>
+                    <th>التفاصيل</th>
+                </tr>
+                <tr>
+                    <td><strong>C-1:</strong> SQL Injection</td>
+                    <td><span class="status critical">🔴 حرج</span></td>
+                    <td>حذف أو قفل <code>admin/sql/route.ts</code> — إزالة <code>$queryRawUnsafe</code></td>
+                </tr>
+                <tr>
+                    <td><strong>C-2:</strong> كلمات المرور</td>
+                    <td><span class="status critical">🔴 حرج</span></td>
+                    <td>حذف <code>remark2026</code> من seed.ts + مسحها من Git history</td>
+                </tr>
+                <tr>
+                    <td><strong>C-3:</strong> تفعيل Auth</td>
+                    <td><span class="status critical">🔴 حرج</span></td>
+                    <td>تفعيل NextAuth + إزالة early return من middleware</td>
+                </tr>
+                <tr>
+                    <td><strong>D-2:</strong> Zod Validation</td>
+                    <td><span class="status high">🟠 عالي</span></td>
+                    <td>إضافة schema validation لكل API endpoints</td>
+                </tr>
+                <tr>
+                    <td><strong>E-1:</strong> Automations</td>
+                    <td><span class="status high">🟠 عالي</span></td>
+                    <td>بناء execution engine أو حذف الميزة</td>
+                </tr>
+                <tr>
+                    <td><strong>D-4:</strong> Audit Log</td>
+                    <td><span class="status high">🟠 عالي</span></td>
+                    <td>إضافة جدول AuditLog لتتبع جميع العمليات</td>
+                </tr>
+                <tr>
+                    <td><strong>C-6:</strong> Chat Sanitization</td>
+                    <td><span class="status high">🟠 عالي</span></td>
+                    <td>تعقيم مدخلات الشات لمنع XSS</td>
+                </tr>
+                <tr>
+                    <td><strong>D-1:</strong> PostgreSQL Migration</td>
+                    <td><span class="status pending">🟡 متوسط</span></td>
+                    <td>الانتقال من SQLite إلى PostgreSQL</td>
+                </tr>
+                <tr>
+                    <td><strong>Prisma Schema</strong></td>
+                    <td><span class="status pending">🟡 متوسط</span></td>
+                    <td>إنشاء <code>schema.prisma</code> المفقود + إعداد DB</td>
+                </tr>
+                <tr>
+                    <td><strong>Testing</strong></td>
+                    <td><span class="status pending">🟡 متوسط</span></td>
+                    <td>إضافة اختبارات وحدة + تكامل + e2e</td>
+                </tr>
+                <tr>
+                    <td><strong>Monitoring</strong></td>
+                    <td><span class="status pending">🟡 متوسط</span></td>
+                    <td>إعداد Sentry + structured logging</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Files Changed -->
+        <div class="section">
+            <h2>📁 الملفات المُعدّلة والمُنشأة</h2>
+            <table>
+                <tr>
+                    <th>الملف</th>
+                    <th>النوع</th>
+                    <th>الغرض</th>
+                </tr>
+                <tr>
+                    <td><code>src/app/page.tsx</code></td>
+                    <td>تعديل</td>
+                    <td>Persistence, AI chat, pipeline validation, PDF export</td>
+                </tr>
+                <tr>
+                    <td><code>src/app/layout.tsx</code></td>
+                    <td>تعديل</td>
+                    <td>ErrorBoundary + ToastContainer</td>
+                </tr>
+                <tr>
+                    <td><code>src/lib/creativeStore.ts</code></td>
+                    <td>تعديل</td>
+                    <td>localStorage persistence</td>
+                </tr>
+                <tr>
+                    <td><code>src/lib/productionStore.ts</code></td>
+                    <td>تعديل</td>
+                    <td>localStorage persistence</td>
+                </tr>
+                <tr>
+                    <td><code>middleware.ts</code></td>
+                    <td>تعديل</td>
+                    <td>CSRF + Rate Limiting + Auth bypass</td>
+                </tr>
+                <tr>
+                    <td><code>src/app/api/health/route.ts</code></td>
+                    <td>تعديل</td>
+                    <td>Health check endpoint</td>
+                </tr>
+                <tr>
+                    <td><code>src/lib/texts.ts</code></td>
+                    <td>جديد</td>
+                    <td>نصوص ثنائية اللغة (368 سطر)</td>
+                </tr>
+                <tr>
+                    <td><code>src/lib/errorUtils.ts</code></td>
+                    <td>جديد</td>
+                    <td>Toast system + safeAsync + safeFetch + validateForm</td>
+                </tr>
+                <tr>
+                    <td><code>src/components/ToastContainer.tsx</code></td>
+                    <td>جديد</td>
+                    <td>إشعارات عائمة للأخطاء والنجاح</td>
+                </tr>
+                <tr>
+                    <td><code>src/components/ErrorBoundary.tsx</code></td>
+                    <td>جديد</td>
+                    <td>حماية من الشاشة البيضاء</td>
+                </tr>
+                <tr>
+                    <td><code>src/components/AppLayout.tsx</code></td>
+                    <td>جديد</td>
+                    <td>Build fix stub</td>
+                </tr>
+                <tr>
+                    <td><code>src/lib/prisma.ts</code></td>
+                    <td>جديد</td>
+                    <td>Build fix stub</td>
+                </tr>
+                <tr>
+                    <td><code>src/app/api/auth/[...nextauth]/route.ts</code></td>
+                    <td>جديد</td>
+                    <td>Build fix stub</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Recommendations -->
+        <div class="section">
+            <h2>💡 التوصيات العاجلة</h2>
+            <div class="finding" style="border-right-color: #dc2626;">
+                <h4>1. 🔴 إزالة ثغرة SQL Injection فوراً</h4>
+                <p>حذف ملف <code>admin/sql/route.ts</code> أو استبدال <code>$queryRawUnsafe</code> بـ Prisma ORM
+                    queries. هذه أخطر ثغرة بالنظام.</p>
+            </div>
+            <div class="finding" style="border-right-color: #dc2626;">
+                <h4>2. 🔴 تغيير كلمات المرور + مسحها من Git</h4>
+                <p>إجبار تغيير كلمة المرور لجميع الحسابات الـ 12 واستخدام <code>process.env.DEFAULT_PASSWORD</code> بدل
+                    الكتابة المباشرة.</p>
+            </div>
+            <div class="finding high">
+                <h4>3. 🟠 تفعيل المصادقة في Middleware</h4>
+                <p>الـ middleware جاهز — فقط حذف <code>return NextResponse.next()</code> من السطر 27 بعد إعداد NextAuth
+                    الكامل.</p>
+            </div>
+            <div class="finding high">
+                <h4>4. 🟠 إنشاء schema.prisma + إعداد قاعدة البيانات</h4>
+                <p>النظام يستخدم stub files حالياً. يجب إنشاء schema.prisma الحقيقي وتشغيل
+                    <code>npx prisma generate</code>.</p>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="footer">
+        <p>تم الإنشاء بواسطة Antigravity AI — Remark PM Security Audit</p>
+        <p style="margin-top:4px">📅 8 مارس 2026 — الساعة 00:17</p>
+        <p style="margin-top:4px">المطور: عبدالله جبار | المراجع: AI Systems Auditor</p>
+    </div>
+
+</body>
+
+</html>

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import prisma from '@/lib/prisma';
+import { channelCreateSchema, parseBody } from '@/lib/validations';
 
 // GET /api/channels — list user's channels
 export async function GET() {
@@ -37,7 +38,12 @@ export async function POST(request: Request) {
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const userId = (session.user as any).id;
-    const { name, description, channelType, memberIds } = await request.json();
+    const body = await request.json();
+    const parsed = parseBody(channelCreateSchema, body);
+    if (!parsed.success) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+    }
+    const { name, description, channelType, memberIds } = parsed.data;
 
     // find workspace
     const wm = await prisma.workspaceMember.findFirst({ where: { userId } });

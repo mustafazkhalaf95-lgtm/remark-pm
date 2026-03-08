@@ -226,6 +226,7 @@ export async function POST(request: Request) {
             actions: executedActions,
         });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('[Automations Execute POST]', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

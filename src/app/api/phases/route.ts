@@ -95,6 +95,7 @@ export async function PUT(request: Request) {
 
         return NextResponse.json({ success: true });
     } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('[Phases PUT]', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

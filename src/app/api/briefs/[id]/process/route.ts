@@ -57,11 +57,10 @@ function addDays(date: Date, days: number): Date {
     return result;
 }
 
-export async function POST(request: Request, { params }: { params: { id: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
+    const { id: briefId } = await params;
     const session = await getServerSession(authOptions);
     if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const briefId = params.id;
 
     try {
         // Fetch the brief
@@ -173,6 +172,6 @@ export async function POST(request: Request, { params }: { params: { id: string 
         return NextResponse.json({ card: result, aiSummary, phasesCreated: phases.length });
     } catch (error: any) {
         console.error('Brief processing error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }

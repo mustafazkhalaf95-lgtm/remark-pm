@@ -2285,3 +2285,154 @@
   color: var(--text-primary);
   background: var(--bg-glass-50);
 }
+
+/* ═══════════════════════════════════════════════════════════
+   RESPONSIVE DESIGN
+   ═══════════════════════════════════════════════════════════ */
+
+/* Tablet (≤1024px) */
+@media (max-width: 1024px) {
+  .header {
+    padding: 20px 24px 16px;
+  }
+  .content {
+    padding: 0 24px 24px;
+  }
+  .actionCards {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .actionCard {
+    padding: 20px;
+    min-height: 120px;
+  }
+  .statsRow {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+  }
+  .pipelineSection {
+    gap: 14px;
+  }
+}
+
+/* Small Tablet (≤768px) */
+@media (max-width: 768px) {
+  .header {
+    padding: 16px 16px 12px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .headerRight {
+    gap: 8px;
+  }
+  .content {
+    padding: 0 16px 16px;
+  }
+  .actionCards {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+  .actionCard {
+    padding: 18px;
+    min-height: auto;
+    flex-direction: row;
+    align-items: center;
+  }
+  .actionCard:hover {
+    transform: translateY(-2px) scale(1.01);
+  }
+  .actionIcon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+  .actionTitle {
+    font-size: 14px;
+  }
+  .statsRow {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .statBox {
+    padding: 10px;
+  }
+  .pipelineSection {
+    gap: 10px;
+  }
+  .pipelineCard {
+    padding: 14px;
+  }
+  .pipelineStages {
+    overflow-x: auto;
+  }
+  .wizardOverlay,
+  .modalOverlay {
+    padding: 12px;
+  }
+  .wizardPanel {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 16px;
+    max-height: 90vh;
+  }
+  .boardTitle {
+    font-size: 14px;
+  }
+  .logoText {
+    font-size: 18px;
+  }
+  .logoIcon {
+    width: 34px;
+    height: 34px;
+    font-size: 16px;
+  }
+}
+
+/* Phone (≤480px) */
+@media (max-width: 480px) {
+  .header {
+    padding: 12px 10px 10px;
+  }
+  .content {
+    padding: 0 10px 10px;
+  }
+  .actionCards {
+    gap: 8px;
+  }
+  .actionCard {
+    padding: 14px;
+  }
+  .actionTitle {
+    font-size: 13px;
+  }
+  .statsRow {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .statBox {
+    padding: 8px;
+    font-size: 12px;
+  }
+  .pipelineCard {
+    padding: 12px;
+  }
+  .pipelineClientName {
+    font-size: 14px;
+  }
+  .pipelineStageItem {
+    min-width: 60px;
+  }
+  .pipelineStageLabel,
+  .pipelineStageLabelActive {
+    font-size: 10px;
+  }
+  .wizardPanel {
+    padding: 16px;
+    border-radius: 12px;
+  }
+  .headerDivider {
+    display: none;
+  }
+}

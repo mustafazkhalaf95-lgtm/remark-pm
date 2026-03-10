@@ -6,7 +6,7 @@
 
 import { useState } from 'react';
 import { signIn } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -15,6 +15,7 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [lang, setLang] = useState<'ar' | 'en'>('ar');
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const t = {
         ar: {
@@ -58,8 +59,8 @@ export default function LoginPage() {
             if (result?.error) {
                 setError(text.error);
             } else {
-                router.push('/');
-                router.refresh();
+                const callbackUrl = searchParams?.get('callbackUrl') || '/';
+                router.push(callbackUrl);
             }
         } catch {
             setError(text.error);

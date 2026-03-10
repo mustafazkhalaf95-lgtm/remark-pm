@@ -754,8 +754,11 @@ model Expense {
   receiptUrl  String   @default("")
   clientId    String?
   campaignId  String?
+  taskType    String?  // 'creative_request' | 'production_job' | 'publishing_item' | 'marketing_task'
+  taskId      String?  // ID of the linked task
   status      String   @default("pending") // pending, approved, rejected
   approvedBy  String?
+  approvedAt  DateTime?
   createdBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -763,6 +766,7 @@ model Expense {
   @@index([category])
   @@index([status])
   @@index([date])
+  @@index([taskType, taskId])
 }
 
 model Budget {

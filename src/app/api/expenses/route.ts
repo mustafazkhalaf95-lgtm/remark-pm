@@ -4,14 +4,14 @@ import prisma from '@/lib/prisma';
 import { errorToResponse } from '@/lib/apiError';
 import { sendSuccess, sendPaginated, parsePagination, parseFilters, buildWhere, buildOrderBy } from '@/lib/routeHandlers';
 
-// GET — List expenses with filters (category, status, clientId, dateRange)
+// GET — List expenses with filters (category, status, clientId, taskType, taskId, dateRange)
 export async function GET(req: Request) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
 
     try {
         const { take, skip, orderBy, orderDir } = parsePagination(req.url);
-        const filters = parseFilters(req.url, ['category', 'status', 'clientId']);
+        const filters = parseFilters(req.url, ['category', 'status', 'clientId', 'taskType', 'taskId']);
         const { searchParams } = new URL(req.url);
         const search = searchParams.get('search') || undefined;
         const dateFrom = searchParams.get('dateFrom');
@@ -41,14 +41,14 @@ export async function GET(req: Request) {
     }
 }
 
-// POST — Create expense
+// POST — Create expense (with optional task link)
 export async function POST(req: Request) {
     const auth = await requireAuth();
     if (auth.error) return auth.error;
 
     try {
         const body = await req.json();
-        const { category, description, descriptionAr, amount, currency, date, receiptUrl, clientId, campaignId, status } = body;
+        const { category, description, descriptionAr, amount, currency, date, receiptUrl, clientId, campaignId, taskType, taskId, status } = body;
 
         if (!category || !description || amount === undefined) {
             return NextResponse.json(
@@ -68,12 +68,14 @@ export async function POST(req: Request) {
                 receiptUrl: receiptUrl || '',
                 clientId: clientId || null,
                 campaignId: campaignId || null,
+                taskType: taskType || null,
+                taskId: taskId || null,
                 status: status || 'pending',
                 createdBy: auth.session.user.id,
             },
         });
 
-        await logAudit(auth.session.user.id, 'created', 'expenses', { id: expense.id, category, amount });
+        await logAudit(auth.session.user.id, 'created', 'expenses', { id: expense.id, category, amount, taskType, taskId });
         return sendSuccess(expense, 201);
     } catch (error) {
         return errorToResponse(error);

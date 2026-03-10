@@ -855,3 +855,276 @@
     font-size: 11px;
     color: var(--text-muted);
 }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .header {
+        flex-wrap: wrap;
+        padding: 12px 16px;
+        gap: 10px;
+    }
+
+    .headerLeft {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .content {
+        padding: 16px;
+        gap: 18px;
+    }
+
+    .boardName {
+        font-size: 14px;
+    }
+
+    .kpiGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .kpiValue {
+        font-size: 22px;
+    }
+
+    .campaignGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .campaignCard {
+        padding: 14px;
+    }
+
+    .campName {
+        font-size: 13px;
+    }
+
+    .pipelineCols {
+        gap: 8px;
+    }
+
+    .pipelineCol {
+        min-width: 160px;
+    }
+
+    .calGrid {
+        gap: 1px;
+    }
+
+    .calDay {
+        min-height: 55px;
+        padding: 3px;
+        font-size: 11px;
+    }
+
+    .calDayNum {
+        font-size: 10px;
+    }
+
+    .teamGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .teamCard {
+        padding: 10px;
+    }
+
+    .activityItem {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    .modal {
+        padding: 20px;
+        width: 95%;
+    }
+
+    .modalTitle {
+        font-size: 16px;
+    }
+
+    .navSwitcher {
+        flex-wrap: wrap;
+        border-radius: 14px;
+    }
+
+    .navActive,
+    .navInactive {
+        font-size: 12px;
+        padding: 6px 12px;
+    }
+
+    .drawer {
+        padding: 16px;
+    }
+
+    .drawerTitle {
+        font-size: 15px;
+    }
+
+    .alertCard {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    .sectionTitle {
+        font-size: 13px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding: 10px;
+    }
+
+    .content {
+        padding: 10px;
+        gap: 14px;
+    }
+
+    .boardName {
+        font-size: 13px;
+    }
+
+    .logoText {
+        font-size: 15px;
+    }
+
+    .logoIcon {
+        width: 30px;
+        height: 30px;
+        font-size: 13px;
+    }
+
+    .kpiGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .kpiCard {
+        padding: 12px;
+    }
+
+    .kpiValue {
+        font-size: 20px;
+    }
+
+    .kpiLabel {
+        font-size: 11px;
+    }
+
+    .campaignCard {
+        padding: 12px;
+    }
+
+    .campName {
+        font-size: 12px;
+    }
+
+    .campBadge {
+        font-size: 10px;
+        padding: 2px 8px;
+    }
+
+    .pipelineCol {
+        min-width: 140px;
+        padding: 8px;
+    }
+
+    .pipelineJobCard {
+        padding: 8px;
+        font-size: 11px;
+    }
+
+    .pipelineJobTitle {
+        font-size: 12px;
+    }
+
+    .calDay {
+        min-height: 44px;
+        padding: 2px;
+    }
+
+    .calDayNum {
+        font-size: 9px;
+    }
+
+    .calEvent {
+        font-size: 8px;
+        padding: 1px 3px;
+    }
+
+    .teamCard {
+        gap: 8px;
+        padding: 8px;
+    }
+
+    .teamAvatar {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    .teamName {
+        font-size: 12px;
+    }
+
+    .activityItem {
+        padding: 6px 8px;
+        font-size: 11px;
+        gap: 6px;
+    }
+
+    .activityIcon {
+        font-size: 14px;
+    }
+
+    .alertCard {
+        padding: 8px 10px;
+        font-size: 11px;
+        gap: 6px;
+    }
+
+    .modal {
+        padding: 16px;
+    }
+
+    .modalTitle {
+        font-size: 15px;
+    }
+
+    .btnPrimary,
+    .btnSecondary {
+        padding: 8px 16px;
+        font-size: 13px;
+    }
+
+    .drawer {
+        padding: 12px;
+    }
+
+    .drawerTitle {
+        font-size: 14px;
+    }
+
+    .sectionTitle {
+        font-size: 12px;
+    }
+
+    .iconBtn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .userAvatar {
+        width: 30px;
+        height: 30px;
+        font-size: 10px;
+    }
+
+    .boardDot {
+        display: none;
+    }
+
+    .headerDivider {
+        display: none;
+    }
+}

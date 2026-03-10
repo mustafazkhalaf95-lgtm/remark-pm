@@ -10,6 +10,8 @@ export interface SessionUser {
     id: string;
     email: string;
     name: string;
+    nameAr: string;
+    avatar: string;
     role: string;
     roles: string[];
     permissions: string[];
@@ -28,6 +30,8 @@ export function useCurrentUser() {
         id: u.id || '',
         email: u.email || '',
         name: u.name || '',
+        nameAr: u.nameAr || '',
+        avatar: u.avatar || '',
         role: u.role || 'viewer',
         roles: u.roles || [],
         permissions: u.permissions || [],

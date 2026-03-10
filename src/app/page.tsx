@@ -6,6 +6,7 @@ import { useSettings } from '@/lib/useSettings';
 import { useUsers, useClients } from '@/lib/hooks';
 import { apiMutate, apiUrl } from '@/lib/hooks';
 import { texts } from '@/lib/texts';
+import ProfileDropdown from '@/components/ProfileDropdown';
 import styles from "./page.module.css";
 
 
@@ -420,7 +421,7 @@ export default function Home() {
           <button className={styles.iconBtn} title={t.langToggle} onClick={toggleLang}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
           </button>
-          <div className={styles.userAvatar}>م.خ</div>
+          <ProfileDropdown />
           <div className={styles.headerDivider} />
           {/* Board Switcher */}
           <div className={styles.navSwitcher}>
@@ -442,7 +443,6 @@ export default function Home() {
             <div>
               <div className={`${styles.actionIcon} ${styles.actionIconBlue}`}>📋</div>
               <div className={styles.actionTitle}>{t.buildPlan}</div>
-              <div className={styles.actionDesc}>{t.buildPlanDesc}</div>
             </div>
             <div className={styles.actionArrow}>→</div>
           </div>
@@ -450,7 +450,6 @@ export default function Home() {
             <div>
               <div className={`${styles.actionIcon} ${styles.actionIconPurple}`}>✏️</div>
               <div className={styles.actionTitle}>{t.editPlan}</div>
-              <div className={styles.actionDesc}>{t.editPlanDesc}</div>
             </div>
             <div className={styles.actionArrow}>→</div>
           </div>
@@ -458,7 +457,6 @@ export default function Home() {
             <div>
               <div className={`${styles.actionIcon} ${styles.actionIconCyan}`}>📊</div>
               <div className={styles.actionTitle}>{t.monthlyUpdate}</div>
-              <div className={styles.actionDesc}>{t.monthlyUpdateDesc}</div>
             </div>
             <div className={styles.actionArrow}>→</div>
           </div>

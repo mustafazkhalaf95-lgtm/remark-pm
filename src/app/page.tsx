@@ -90,6 +90,12 @@ export default function Home() {
   const [showAddViewer, setShowAddViewer] = useState(false);
   const [boardViewers, setBoardViewers] = useState<string[]>(['mustafa_khalaf', 'yousef_kazem', 'seif_ali']);
 
+  // New Task modal state
+  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  const [newTaskClientType, setNewTaskClientType] = useState<'warda' | 'converted' | null>(null);
+  const [newTaskClientIdx, setNewTaskClientIdx] = useState<number | null>(null);
+  const [newTaskData, setNewTaskData] = useState({ title: '', description: '', priority: 'medium', platform: '', dueDate: '' });
+
   // ── Hydrate from localStorage + DB AFTER mount ──
   const hydrated = useRef(false);
   useEffect(() => {
@@ -133,7 +139,7 @@ export default function Home() {
           fromDB: true,
         }));
         if (dbClients.length > 0) setConvertedClients(dbClients);
-      }).catch(() => {});
+      }).catch(() => { });
     }
     hydrated.current = true;
   }, []);
@@ -932,7 +938,7 @@ export default function Home() {
                       <button className={styles.clientBtnIcon} title={t.taskListHint} onClick={(e) => { e.stopPropagation(); setShowConvertedTaskList(prev => ({ ...prev, [ci]: !prev[ci] })); }}>
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
                       </button>
-                      <button className={`${styles.clientBtn} ${styles.btnNewTask}`}>
+                      <button className={`${styles.clientBtn} ${styles.btnNewTask}`} onClick={(e) => { e.stopPropagation(); setNewTaskClientType('converted'); setNewTaskClientIdx(ci); setNewTaskData({ title: '', description: '', priority: 'medium', platform: '', dueDate: '' }); setShowNewTaskModal(true); }}>
                         {t.newTask}
                       </button>
                       <button className={styles.clientBtnClose} onClick={(e) => { e.stopPropagation(); setExpandedConvertedIdx(null); }} title={t.minimize}>
@@ -1142,7 +1148,7 @@ export default function Home() {
                   <button className={styles.clientBtnIcon} title={t.taskListHint} onClick={(e) => { e.stopPropagation(); setShowTaskList(!showTaskList); }}>
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" /></svg>
                   </button>
-                  <button className={`${styles.clientBtn} ${styles.btnNewTask}`}>
+                  <button className={`${styles.clientBtn} ${styles.btnNewTask}`} onClick={(e) => { e.stopPropagation(); setNewTaskClientType('warda'); setNewTaskClientIdx(null); setNewTaskData({ title: '', description: '', priority: 'medium', platform: '', dueDate: '' }); setShowNewTaskModal(true); }}>
                     {t.newTask}
                   </button>
                   <button className={styles.clientBtnClose} onClick={(e) => { e.stopPropagation(); setExpanded(false); }} title={t.minimize}>
@@ -1822,6 +1828,80 @@ export default function Home() {
                 }
                 setShowMonthlySummary(false);
               }}>{t.summarySubmit}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ New Task Modal ═══ */}
+      {showNewTaskModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowNewTaskModal(false)}>
+          <div style={{ width: 520, maxWidth: '90vw', borderRadius: 20, background: 'var(--bg, #fff)', border: '1px solid var(--border, rgba(0,0,0,0.1))', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border, rgba(0,0,0,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, rgba(34,197,94,0.08), rgba(16,185,129,0.06))' }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary, #1e293b)' }}>📝 {lang === 'ar' ? 'مهمة جديدة' : 'New Task'}</div>
+              <button onClick={() => setShowNewTaskModal(false)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✕</button>
+            </div>
+            <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary, #64748b)', marginBottom: 6, display: 'block' }}>{lang === 'ar' ? 'عنوان المهمة *' : 'Task Title *'}</label>
+                <input value={newTaskData.title} onChange={e => setNewTaskData(p => ({ ...p, title: e.target.value }))} placeholder={lang === 'ar' ? 'مثال: تصميم بوست إنستغرام' : 'e.g. Design Instagram post'} style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border, rgba(0,0,0,0.15))', fontSize: 14, background: 'var(--bg-secondary, #f8fafc)', outline: 'none', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary, #64748b)', marginBottom: 6, display: 'block' }}>{lang === 'ar' ? 'الوصف' : 'Description'}</label>
+                <textarea value={newTaskData.description} onChange={e => setNewTaskData(p => ({ ...p, description: e.target.value }))} rows={3} placeholder={lang === 'ar' ? 'وصف المهمة...' : 'Task description...'} style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border, rgba(0,0,0,0.15))', fontSize: 14, background: 'var(--bg-secondary, #f8fafc)', outline: 'none', resize: 'vertical', color: 'var(--text-primary)' }} />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary, #64748b)', marginBottom: 6, display: 'block' }}>{lang === 'ar' ? 'الأولوية' : 'Priority'}</label>
+                  <select value={newTaskData.priority} onChange={e => setNewTaskData(p => ({ ...p, priority: e.target.value }))} style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border, rgba(0,0,0,0.15))', fontSize: 14, background: 'var(--bg-secondary, #f8fafc)', color: 'var(--text-primary)' }}>
+                    <option value="low">{lang === 'ar' ? '🟢 منخفضة' : '🟢 Low'}</option>
+                    <option value="medium">{lang === 'ar' ? '🟡 متوسطة' : '🟡 Medium'}</option>
+                    <option value="high">{lang === 'ar' ? '🟠 عالية' : '🟠 High'}</option>
+                    <option value="urgent">{lang === 'ar' ? '🔴 عاجلة' : '🔴 Urgent'}</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary, #64748b)', marginBottom: 6, display: 'block' }}>{lang === 'ar' ? 'المنصة' : 'Platform'}</label>
+                  <select value={newTaskData.platform} onChange={e => setNewTaskData(p => ({ ...p, platform: e.target.value }))} style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border, rgba(0,0,0,0.15))', fontSize: 14, background: 'var(--bg-secondary, #f8fafc)', color: 'var(--text-primary)' }}>
+                    <option value="">{lang === 'ar' ? 'اختر المنصة' : 'Select platform'}</option>
+                    <option value="instagram">Instagram</option>
+                    <option value="tiktok">TikTok</option>
+                    <option value="snapchat">Snapchat</option>
+                    <option value="twitter">Twitter / X</option>
+                    <option value="facebook">Facebook</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="linkedin">LinkedIn</option>
+                    <option value="website">Website</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary, #64748b)', marginBottom: 6, display: 'block' }}>{lang === 'ar' ? 'تاريخ الاستحقاق' : 'Due Date'}</label>
+                <input type="date" value={newTaskData.dueDate} onChange={e => setNewTaskData(p => ({ ...p, dueDate: e.target.value }))} style={{ width: '100%', padding: '10px 14px', borderRadius: 12, border: '1px solid var(--border, rgba(0,0,0,0.15))', fontSize: 14, background: 'var(--bg-secondary, #f8fafc)', color: 'var(--text-primary)' }} />
+              </div>
+              <button onClick={() => {
+                if (!newTaskData.title.trim()) return;
+                const task = {
+                  id: Date.now(),
+                  title: newTaskData.title,
+                  description: newTaskData.description,
+                  priority: newTaskData.priority,
+                  platform: newTaskData.platform,
+                  dueDate: newTaskData.dueDate,
+                  status: 'pending',
+                  createdAt: new Date().toISOString(),
+                };
+                if (newTaskClientType === 'warda') {
+                  // Add to الوردة tasks - use existing task list logic
+                  setChatMessages(prev => [...prev, { sender: 'System', text: `📝 ${lang === 'ar' ? 'مهمة جديدة:' : 'New task:'} ${task.title}`, time: new Date().toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' }), avatar: '📝', type: 'system' }]);
+                } else if (newTaskClientType === 'converted' && newTaskClientIdx !== null) {
+                  setConvertedChatMsgs(prev => ({ ...prev, [newTaskClientIdx]: [...(prev[newTaskClientIdx] || []), { sender: 'System', text: `📝 ${lang === 'ar' ? 'مهمة جديدة:' : 'New task:'} ${task.title}`, time: new Date().toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' }), avatar: '📝', type: 'system' }] }));
+                }
+                setShowNewTaskModal(false);
+                setNewTaskData({ title: '', description: '', priority: 'medium', platform: '', dueDate: '' });
+              }} style={{ padding: '12px 24px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg, #22c55e, #16a34a)', color: '#fff', fontSize: 15, fontWeight: 800, cursor: 'pointer', transition: 'all .2s' }}>
+                {lang === 'ar' ? '✅ إنشاء المهمة' : '✅ Create Task'}
+              </button>
             </div>
           </div>
         </div>

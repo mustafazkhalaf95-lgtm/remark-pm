@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+const DEFAULT_PASSWORD = 'Remark@2026!';
 
 async function main() {
     console.log('🌱 Seeding Remark PM database...\n');
@@ -208,8 +210,10 @@ async function main() {
         { email: 'ibrahim@remark.iq', fullName: 'إبراهيم', fullNameAr: 'إبراهيم', displayName: 'Ibrahim', displayNameAr: 'إبراهيم', position: 'Publisher', role: 'staff', department: 'publishing', avatar: 'إ', employeeCode: 'RMK-012' },
     ];
 
+    const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 12);
+
     for (const u of userDefs) {
-        const user = await prisma.user.create({ data: { email: u.email, password: '', status: 'active' } });
+        const user = await prisma.user.create({ data: { email: u.email, password: hashedPassword, status: 'active' } });
         await prisma.userProfile.create({
             data: {
                 userId: user.id,

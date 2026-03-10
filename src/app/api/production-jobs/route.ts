@@ -7,7 +7,7 @@ import { productionJobCreateSchema } from '@/lib/validations';
 
 // GET — List with pagination + filters
 export async function GET(req: Request) {
-    const auth = await requirePermission('view:production');
+    const auth = await requirePermission('production.view');
     if (auth.error) return auth.error;
 
     try {
@@ -22,6 +22,7 @@ export async function GET(req: Request) {
                 include: {
                     client: true,
                     campaign: true,
+                    assignee: { include: { profile: true } },
                 },
                 orderBy: buildOrderBy(orderBy, orderDir, ['createdAt', 'title', 'priority', 'status']),
                 take,
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
 
 // POST — Create
 export async function POST(req: Request) {
-    const auth = await requirePermission('manage:production');
+    const auth = await requirePermission('production.manage');
     if (auth.error) return auth.error;
 
     try {

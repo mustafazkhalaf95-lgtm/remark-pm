@@ -7,7 +7,7 @@ import { creativeRequestUpdateSchema } from '@/lib/validations';
 
 // GET — Single creative request
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requirePermission('view:creative');
+    const auth = await requirePermission('creative.view');
     if (auth.error) return auth.error;
 
     try {
@@ -29,7 +29,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 // PUT — Update
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requirePermission('manage:creative');
+    const auth = await requirePermission('creative.manage');
     if (auth.error) return auth.error;
 
     try {
@@ -55,7 +55,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 // DELETE — Archive (soft delete)
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requirePermission('manage:creative');
+    const auth = await requirePermission('creative.manage');
     if (auth.error) return auth.error;
 
     try {

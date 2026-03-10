@@ -44,7 +44,7 @@ function checkRateLimit(userId: string): boolean {
 
 // GET /api/admin/sql — Safe schema info queries only
 export async function GET(request: Request) {
-    const auth = await requireRole(['CEO', 'COO']);
+    const auth = await requireRole(['ceo', 'coo']);
     if (auth.error) return auth.error;
 
     if (!checkRateLimit(auth.session.user.id)) {
@@ -100,7 +100,7 @@ export async function GET(request: Request) {
 
 // POST /api/admin/sql — Safe read-only queries with hardened validation
 export async function POST(request: Request) {
-    const auth = await requireRole(['CEO', 'COO']);
+    const auth = await requireRole(['ceo', 'coo']);
     if (auth.error) return auth.error;
 
     if (!checkRateLimit(auth.session.user.id)) {

@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireRole } from '@/lib/auth';
 
 export async function GET(req: Request) {
-    const auth = await requireRole(['CEO', 'COO', 'CTO']);
+    const auth = await requireRole(['ceo', 'coo', 'admin']);
     if (auth.error) return auth.error;
 
     try {

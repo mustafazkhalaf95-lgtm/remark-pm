@@ -1,101 +1,97 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 
-// Complete a phase and activate the next one
-export async function PUT(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+// PUT /api/phases - Manage task status transitions
+// Replaces the old TaskPhase-based workflow with direct status updates
+// on MarketingTask, CreativeRequest, ProductionJob, and PublishingItem.
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { taskId, taskType, action } = body as {
+      taskId: string;
+      taskType: 'marketing_task' | 'creative_request' | 'production_job' | 'publishing_item';
+      action: 'start' | 'complete' | 'block';
+    };
 
-    try {
-        const { phaseId, action } = await request.json(); // action: 'complete', 'block', 'start'
-        if (!phaseId || !action) return NextResponse.json({ error: 'Missing phaseId or action' }, { status: 400 });
-
-        const phase = await prisma.taskPhase.findUnique({
-            where: { id: phaseId },
-            include: { card: true },
-        });
-        if (!phase) return NextResponse.json({ error: 'Phase not found' }, { status: 404 });
-
-        if (action === 'start') {
-            await prisma.taskPhase.update({
-                where: { id: phaseId },
-                data: { status: 'IN_PROGRESS', startedAt: new Date() },
-            });
-        } else if (action === 'complete') {
-            // Mark current phase as complete
-            await prisma.taskPhase.update({
-                where: { id: phaseId },
-                data: { status: 'COMPLETED', completedAt: new Date() },
-            });
-
-            // Find and activate the next phase
-            const nextPhase = await prisma.taskPhase.findFirst({
-                where: {
-                    cardId: phase.cardId,
-                    position: phase.position + 1,
-                },
-            });
-
-            if (nextPhase) {
-                await prisma.taskPhase.update({
-                    where: { id: nextPhase.id },
-                    data: { status: 'IN_PROGRESS', startedAt: new Date() },
-                });
-
-                // Update card's current phase
-                await prisma.card.update({
-                    where: { id: phase.cardId },
-                    data: { currentPhase: nextPhase.phase },
-                });
-
-                // Notify the next assignee
-                if (nextPhase.assigneeId) {
-                    await prisma.notification.create({
-                        data: {
-                            userId: nextPhase.assigneeId,
-                            title: `دورك الآن: ${phase.card.name}`,
-                            body: `تم إكمال المرحلة السابقة وأصبحت مهمتك جاهزة للعمل عليها.`,
-                            type: 'ASSIGNMENT',
-                        },
-                    });
-
-                    // Auto-assign next phase user to the card
-                    await prisma.cardAssignee.create({
-                        data: { cardId: phase.cardId, userId: nextPhase.assigneeId },
-                    }).catch(() => { });
-                }
-            } else {
-                // All phases complete — mark card as completed
-                await prisma.card.update({
-                    where: { id: phase.cardId },
-                    data: { status: 'COMPLETED', dueComplete: true, currentPhase: 'DONE' },
-                });
-            }
-        } else if (action === 'block') {
-            await prisma.taskPhase.update({
-                where: { id: phaseId },
-                data: { status: 'BLOCKED' },
-            });
-
-            // Notify COO about the block
-            const coo = await prisma.user.findFirst({ where: { role: 'COO' } });
-            if (coo) {
-                await prisma.notification.create({
-                    data: {
-                        userId: coo.id,
-                        title: `⚠️ مهمة متعثرة: ${phase.card.name}`,
-                        body: `تم تعليق مرحلة "${phase.phase}" — تحتاج تدخل.`,
-                        type: 'STATUS_CHANGE',
-                    },
-                });
-            }
-        }
-
-        return NextResponse.json({ success: true });
-    } catch (error: any) {
-        console.error('[Phases PUT]', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (!taskId || !taskType || !action) {
+      return NextResponse.json(
+        { error: 'taskId, taskType, and action are required' },
+        { status: 400 }
+      );
     }
+
+    const statusMap: Record<string, string> = {
+      start: 'in_progress',
+      complete: 'completed',
+      block: 'blocked',
+    };
+
+    const newStatus = statusMap[action];
+    if (!newStatus) {
+      return NextResponse.json(
+        { error: 'Invalid action. Use: start, complete, or block' },
+        { status: 400 }
+      );
+    }
+
+    let updated: unknown = null;
+
+    switch (taskType) {
+      case 'marketing_task': {
+        updated = await prisma.marketingTask.update({
+          where: { id: taskId },
+          data: {
+            status: newStatus,
+            ...(action === 'complete' ? { completedAt: new Date() } : {}),
+          },
+        });
+        break;
+      }
+
+      case 'creative_request': {
+        const crStatus = action === 'complete' ? 'approved' : action === 'block' ? 'new_request' : 'in_progress';
+        updated = await prisma.creativeRequest.update({
+          where: { id: taskId },
+          data: {
+            status: crStatus,
+            ...(action === 'block' ? { blocked: true, blockReason: 'Blocked via phase transition' } : {}),
+            ...(action === 'start' ? { blocked: false, blockReason: '' } : {}),
+          },
+        });
+        break;
+      }
+
+      case 'production_job': {
+        updated = await prisma.productionJob.update({
+          where: { id: taskId },
+          data: { status: newStatus },
+        });
+        break;
+      }
+
+      case 'publishing_item': {
+        const pubStatus = action === 'complete' ? 'published' : action === 'start' ? 'scheduled' : 'draft';
+        updated = await prisma.publishingItem.update({
+          where: { id: taskId },
+          data: {
+            status: pubStatus,
+            ...(action === 'complete' ? { publishedAt: new Date() } : {}),
+          },
+        });
+        break;
+      }
+
+      default:
+        return NextResponse.json(
+          { error: 'Invalid taskType. Use: marketing_task, creative_request, production_job, or publishing_item' },
+          { status: 400 }
+        );
+    }
+
+    return NextResponse.json({ success: true, task: updated });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    console.error('[Phases PUT]', error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

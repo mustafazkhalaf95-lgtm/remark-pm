@@ -7,7 +7,7 @@ import { creativeRequestCreateSchema } from '@/lib/validations';
 
 // GET — List with pagination + filters
 export async function GET(req: Request) {
-    const auth = await requirePermission('view:creative');
+    const auth = await requirePermission('creative.view');
     if (auth.error) return auth.error;
 
     try {
@@ -22,6 +22,8 @@ export async function GET(req: Request) {
                 include: {
                     client: true,
                     campaign: true,
+                    conceptWriter: { include: { profile: true } },
+                    executor: { include: { profile: true } },
                 },
                 orderBy: buildOrderBy(orderBy, orderDir, ['createdAt', 'title', 'priority', 'status']),
                 take,
@@ -37,7 +39,7 @@ export async function GET(req: Request) {
 
 // POST — Create
 export async function POST(req: Request) {
-    const auth = await requirePermission('manage:creative');
+    const auth = await requirePermission('creative.manage');
     if (auth.error) return auth.error;
 
     try {

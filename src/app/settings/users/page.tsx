@@ -1,24 +1,44 @@
 'use client';
 import { useState, useMemo } from 'react';
 import s from '../settings.module.css';
-import { TEAM, DEPT_LABELS, ROLE_LABELS, DEPARTMENTS, ROLES, type TeamMember, type Role, type Department } from '@/lib/teamStore';
+import { useUsers } from '@/lib/hooks';
 
 export default function UsersSettings() {
+    const { users, loading, error } = useUsers();
     const [search, setSearch] = useState('');
     const [toast, setToast] = useState('');
-    const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
 
     const filtered = useMemo(() => {
-        if (!search) return TEAM;
+        if (!search) return users;
         const q = search.toLowerCase();
-        return TEAM.filter(m => m.name.includes(q) || m.nameEn.toLowerCase().includes(q) || m.position.includes(q) || m.positionEn.toLowerCase().includes(q));
-    }, [search]);
+        return users.filter(u =>
+            (u.name || '').toLowerCase().includes(q) ||
+            (u.nameAr || '').includes(q) ||
+            (u.position || '').toLowerCase().includes(q) ||
+            (u.positionAr || '').includes(q) ||
+            (u.email || '').toLowerCase().includes(q)
+        );
+    }, [search, users]);
+
+    // Group users by department
+    const departments = useMemo(() => {
+        const deptMap = new Map<string, typeof users>();
+        for (const u of users) {
+            const dept = u.department || 'Other';
+            if (!deptMap.has(dept)) deptMap.set(dept, []);
+            deptMap.get(dept)!.push(u);
+        }
+        return Array.from(deptMap.entries());
+    }, [users]);
+
+    if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>⏳ جاري التحميل...</div>;
+    if (error) return <div style={{ padding: 40, textAlign: 'center', color: '#ef4444' }}>❌ خطأ: {error}</div>;
 
     return (
         <div>
             <div className={s.pageHeader}>
-                <h1 className={s.pageTitle}>👥 إدارة الفريق — الفريق الحقيقي</h1>
-                <p className={s.pageSubtitle}>13 عضو فريق حقيقي مع أدوار متعددة ومسؤوليات ثانوية</p>
+                <h1 className={s.pageTitle}>👥 إدارة الفريق</h1>
+                <p className={s.pageSubtitle}>{users.length} عضو فريق</p>
             </div>
 
             <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
@@ -30,35 +50,27 @@ export default function UsersSettings() {
             <div className={s.card} style={{ padding: 0 }}>
                 <div className={s.tableWrap}>
                     <table className={s.table}>
-                        <thead><tr><th>العضو</th><th>المنصب</th><th>الأدوار</th><th>القسم</th><th>المسؤوليات الثانوية</th></tr></thead>
+                        <thead><tr><th>العضو</th><th>المنصب</th><th>الدور</th><th>القسم</th><th>البريد</th></tr></thead>
                         <tbody>
-                            {filtered.map(m => (
-                                <tr key={m.id}>
+                            {filtered.map(u => (
+                                <tr key={u.id}>
                                     <td>
                                         <div className={s.profileCard}>
-                                            <div className={s.avatar} style={{ background: `linear-gradient(135deg, ${m.color}, ${m.color}88)` }}>{m.avatar}</div>
+                                            <div className={s.avatar} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf688)' }}>{u.avatar || '👤'}</div>
                                             <div className={s.profileInfo}>
-                                                <span className={s.profileName}>{m.name}</span>
-                                                <span className={s.profileEmail}>{m.nameEn}</span>
+                                                <span className={s.profileName}>{u.nameAr || u.name}</span>
+                                                <span className={s.profileEmail}>{u.name}</span>
                                             </div>
                                         </div>
                                     </td>
-                                    <td style={{ fontSize: 12 }}>{m.position}</td>
+                                    <td style={{ fontSize: 12 }}>{u.positionAr || u.position || '—'}</td>
                                     <td>
-                                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                                            {m.roles.map(r => (
-                                                <span key={r} className={s.badgePurple} style={{ fontSize: 10 }}>{ROLE_LABELS[r]?.ar || r}</span>
-                                            ))}
-                                        </div>
+                                        <span className={s.badgePurple} style={{ fontSize: 10 }}>{u.roleAr || u.role}</span>
                                     </td>
                                     <td>
-                                        <span style={{ fontSize: 12 }}>{DEPT_LABELS[m.department]?.icon} {DEPT_LABELS[m.department]?.ar}</span>
+                                        <span style={{ fontSize: 12 }}>{u.departmentAr || u.department || '—'}</span>
                                     </td>
-                                    <td style={{ fontSize: 11, color: '#64748b' }}>
-                                        {m.secondaryResponsibilities.length > 0
-                                            ? m.secondaryResponsibilities.join('، ')
-                                            : '—'}
-                                    </td>
+                                    <td style={{ fontSize: 11, color: '#64748b' }}>{u.email}</td>
                                 </tr>
                             ))}
                             {filtered.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: 32, color: 'rgba(226,232,240,.3)' }}>لا توجد نتائج</td></tr>}
@@ -71,25 +83,20 @@ export default function UsersSettings() {
             <div style={{ marginTop: 24 }}>
                 <h2 className={s.pageTitle} style={{ fontSize: 16 }}>📊 ملخص الأقسام</h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
-                    {DEPARTMENTS.map(dept => {
-                        const members = TEAM.filter(m => m.department === dept);
-                        const info = DEPT_LABELS[dept];
-                        return (
-                            <div key={dept} className={s.card} style={{ padding: 16 }}>
-                                <div style={{ fontSize: 24, marginBottom: 6 }}>{info.icon}</div>
-                                <div style={{ fontSize: 14, fontWeight: 700 }}>{info.ar}</div>
-                                <div style={{ fontSize: 11, color: '#64748b', marginBottom: 8 }}>{info.en}</div>
-                                <div style={{ fontSize: 20, fontWeight: 800, color: info.color }}>{members.length}</div>
-                                <div style={{ marginTop: 8 }}>
-                                    {members.map(m => (
-                                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0' }}>
-                                            <span>{m.avatar}</span><span>{m.name}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                    {departments.map(([dept, members]) => (
+                        <div key={dept} className={s.card} style={{ padding: 16 }}>
+                            <div style={{ fontSize: 24, marginBottom: 6 }}>👥</div>
+                            <div style={{ fontSize: 14, fontWeight: 700 }}>{dept}</div>
+                            <div style={{ fontSize: 20, fontWeight: 800, color: '#6366f1', marginTop: 4 }}>{members.length}</div>
+                            <div style={{ marginTop: 8 }}>
+                                {members.map(m => (
+                                    <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '2px 0' }}>
+                                        <span>{m.avatar || '👤'}</span><span>{m.nameAr || m.name}</span>
+                                    </div>
+                                ))}
                             </div>
-                        );
-                    })}
+                        </div>
+                    ))}
                 </div>
             </div>
 

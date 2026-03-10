@@ -7,7 +7,7 @@ export async function logAudit(
   userId: string,
   action: string,
   target: string,
-  details?: string
+  details?: string | Record<string, any>
 ): Promise<void> {
   try {
     await prisma.activityLog.create({
@@ -15,9 +15,8 @@ export async function logAudit(
         action: `AUDIT:${action}`,
         entityType: 'AUDIT',
         entityId: target,
-        details: details || null,
+        details: typeof details === 'object' ? JSON.stringify(details) : (details || ''),
         userId,
-        workspaceId: '', // filled by caller if needed
       },
     });
   } catch {

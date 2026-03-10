@@ -7,7 +7,7 @@ import { campaignCreateSchema } from '@/lib/validations';
 
 // GET — List with pagination + filters
 export async function GET(req: Request) {
-    const auth = await requirePermission('view:clients');
+    const auth = await requirePermission('clients.view');
     if (auth.error) return auth.error;
 
     try {
@@ -44,7 +44,7 @@ export async function GET(req: Request) {
 
 // POST — Create
 export async function POST(req: Request) {
-    const auth = await requirePermission('manage:clients');
+    const auth = await requirePermission('clients.manage');
     if (auth.error) return auth.error;
 
     try {

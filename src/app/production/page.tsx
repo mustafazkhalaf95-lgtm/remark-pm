@@ -1,452 +1,1044 @@
 'use client';
-import { useState, useSyncExternalStore, useEffect } from 'react';
+
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import s from './page.module.css';
-import { getProductionStore, PROD_STAGES, PROD_STAGE_META, JOB_CAT_AR, JOB_CAT_EN, JOB_CAT_ICON, PROD_TEAM, type ProdStage, type Campaign, type ProductionJob } from '@/lib/productionStore';
-import { getCreativeStore } from '@/lib/creativeStore';
+import { useProductionJobs, useClients, useCampaigns, useUsers } from '@/lib/hooks';
+import type { ProductionJobData } from '@/lib/hooks';
+import type { ClientData } from '@/lib/hooks';
+import type { CampaignData } from '@/lib/hooks';
+import type { UserData } from '@/lib/hooks';
 import { useSettings } from '@/lib/useSettings';
 
-export default function ProductionHQ() {
-    const store = getProductionStore();
-    const cStore = getCreativeStore();
-    const ver = useSyncExternalStore(cb => store.subscribe(cb), () => store.getVersion(), () => 0);
-    useSyncExternalStore(cb => cStore.subscribe(cb), () => cStore.getVersion(), () => 0);
+/* ═══════════════════════════════════════════════════════
+   Constants
+   ═══════════════════════════════════════════════════════ */
 
+const PIPELINE_STAGES = [
+    'pending',
+    'pre_production',
+    'scheduled',
+    'in_production',
+    'post_production',
+    'review',
+    'delivered',
+] as const;
+
+type PipelineStage = (typeof PIPELINE_STAGES)[number];
+
+const STAGE_META: Record<string, { en: string; ar: string; color: string }> = {
+    pending:         { en: 'Pending',         ar: '\u0628\u0627\u0646\u062a\u0638\u0627\u0631',               color: '#6b7280' },
+    pre_production:  { en: 'Pre-Production',  ar: '\u0645\u0627 \u0642\u0628\u0644 \u0627\u0644\u0625\u0646\u062a\u0627\u062c',     color: '#6366f1' },
+    scheduled:       { en: 'Scheduled',       ar: '\u0645\u062c\u062f\u0648\u0644\u0629',                     color: '#8b5cf6' },
+    in_production:   { en: 'In Production',   ar: '\u0642\u064a\u062f \u0627\u0644\u0625\u0646\u062a\u0627\u062c',           color: '#f59e0b' },
+    post_production: { en: 'Post-Production', ar: '\u0645\u0627 \u0628\u0639\u062f \u0627\u0644\u0625\u0646\u062a\u0627\u062c',     color: '#14b8a6' },
+    review:          { en: 'Review',          ar: '\u0645\u0631\u0627\u062c\u0639\u0629',                     color: '#ec4899' },
+    delivered:       { en: 'Delivered',        ar: '\u062a\u0645 \u0627\u0644\u062a\u0633\u0644\u064a\u0645',               color: '#22c55e' },
+};
+
+const JOB_TYPE_ICONS: Record<string, string> = {
+    video:  '\uD83C\uDFAC',
+    photo:  '\uD83D\uDCF7',
+    motion: '\uD83C\uDF9E\uFE0F',
+    audio:  '\uD83C\uDF99\uFE0F',
+};
+
+const JOB_TYPE_LABELS: Record<string, { en: string; ar: string }> = {
+    video:  { en: 'Video',        ar: '\u0641\u064a\u062f\u064a\u0648' },
+    photo:  { en: 'Photography',  ar: '\u062a\u0635\u0648\u064a\u0631' },
+    motion: { en: 'Motion',       ar: '\u0645\u0648\u0634\u0646' },
+    audio:  { en: 'Audio',        ar: '\u0635\u0648\u062a' },
+};
+
+const PRIORITY_LABELS: Record<string, { en: string; ar: string }> = {
+    urgent: { en: 'Urgent', ar: '\u0639\u0627\u062c\u0644' },
+    high:   { en: 'High',   ar: '\u0645\u0631\u062a\u0641\u0639' },
+    medium: { en: 'Medium', ar: '\u0645\u062a\u0648\u0633\u0637' },
+    low:    { en: 'Low',    ar: '\u0645\u0646\u062e\u0641\u0636' },
+};
+
+const PRIORITY_COLORS: Record<string, string> = {
+    urgent: '#dc2626',
+    high:   '#f59e0b',
+    medium: '#3b82f6',
+    low:    '#6b7280',
+};
+
+/* ═══════════════════════════════════════════════════════
+   New Job Form State Type
+   ═══════════════════════════════════════════════════════ */
+
+interface NewJobForm {
+    title: string;
+    titleAr: string;
+    clientId: string;
+    campaignId: string;
+    jobType: string;
+    priority: string;
+    assigneeId: string;
+    shootDate: string;
+    dueDate: string;
+    location: string;
+    equipment: string;
+    deliverables: string;
+}
+
+const EMPTY_FORM: NewJobForm = {
+    title: '',
+    titleAr: '',
+    clientId: '',
+    campaignId: '',
+    jobType: 'video',
+    priority: 'medium',
+    assigneeId: '',
+    shootDate: '',
+    dueDate: '',
+    location: '',
+    equipment: '',
+    deliverables: '',
+};
+
+/* ═══════════════════════════════════════════════════════
+   Filter State Type
+   ═══════════════════════════════════════════════════════ */
+
+interface Filters {
+    clientId: string;
+    jobType: string;
+    priority: string;
+    status: string;
+}
+
+const EMPTY_FILTERS: Filters = {
+    clientId: '',
+    jobType: '',
+    priority: '',
+    status: '',
+};
+
+/* ═══════════════════════════════════════════════════════
+   Helper: parse JSON field safely
+   ═══════════════════════════════════════════════════════ */
+
+function parseJsonField<T>(raw: string | null | undefined, fallback: T): T {
+    if (!raw) return fallback;
+    try { return JSON.parse(raw); } catch { return fallback; }
+}
+
+/* ═══════════════════════════════════════════════════════
+   Component
+   ═══════════════════════════════════════════════════════ */
+
+export default function ProductionHQ() {
+    /* ── Data hooks ── */
+    const { jobs, loading: jobsLoading, error: jobsError, createJob, updateJob } = useProductionJobs();
+    const { clients, loading: clientsLoading, error: clientsError } = useClients();
+    const { campaigns, loading: campaignsLoading, error: campaignsError } = useCampaigns();
+    const { users, loading: usersLoading, error: usersError } = useUsers();
+
+    /* ── Settings ── */
     const { theme, lang, toggleTheme, toggleLang } = useSettings();
+    const ar = lang === 'ar';
+
+    /* ── UI state ── */
     const [toast, setToast] = useState('');
     const [showNewJob, setShowNewJob] = useState(false);
-    const [selectedJob, setSelectedJob] = useState<string | null>(null);
-    const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
-    const [showStoryboard, setShowStoryboard] = useState<string | null>(null);
+    const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
+    const [newJob, setNewJob] = useState<NewJobForm>(EMPTY_FORM);
+    const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+    const [creating, setCreating] = useState(false);
 
-    const [newJob, setNewJob] = useState({ title: '', clientId: 'client_warda', campaignId: '', category: 'reel_filming' as any, platform: 'Instagram', owner: 'عمر', deadline: '', linkedCreativeRequestId: '' });
-    const [uploadName, setUploadName] = useState('');
-    const [versionLabel, setVersionLabel] = useState('');
+    /* ── Derived: loading / error ── */
+    const loading = jobsLoading || clientsLoading || campaignsLoading || usersLoading;
+    const globalError = jobsError || clientsError || campaignsError || usersError;
 
-    useEffect(() => { const t = store.getToast(); if (t.msg) { setToast(t.msg); setTimeout(() => setToast(''), 3000); } }, [ver, store]);
+    /* ── Filtered jobs ── */
+    const filteredJobs = useMemo(() => {
+        return jobs.filter(j => {
+            if (filters.clientId && j.clientId !== filters.clientId) return false;
+            if (filters.jobType && j.jobType !== filters.jobType) return false;
+            if (filters.priority && j.priority !== filters.priority) return false;
+            if (filters.status && j.status !== filters.status) return false;
+            return true;
+        });
+    }, [jobs, filters]);
 
-    const clients = cStore.clients;
-    const kpis = store.getKPIs();
-    const ar = lang === 'ar';
-    const catL = ar ? JOB_CAT_AR : JOB_CAT_EN;
+    /* ── Lookup helpers ── */
+    const clientName = useCallback((id: string): string => {
+        const c = clients.find((cl: ClientData) => cl.id === id);
+        if (!c) return id;
+        return ar ? (c.nameAr || c.name) : c.name;
+    }, [clients, ar]);
 
-    // Calendar helpers
-    const now = new Date(); const cY = now.getFullYear(); const cM = now.getMonth();
-    const dim = new Date(cY, cM + 1, 0).getDate(); const fdw = new Date(cY, cM, 1).getDay();
-    const dn = ar ? ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'] : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const evDay = (day: number) => { const ds = `${cY}-${String(cM + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`; return store.calendarEvents.filter(e => e.date === ds); };
+    const campaignName = useCallback((id: string): string => {
+        const c = campaigns.find((cm: CampaignData) => cm.id === id);
+        if (!c) return id;
+        return ar ? (c.nameAr || c.name) : c.name;
+    }, [campaigns, ar]);
 
-    // Workload
-    const workload = PROD_TEAM.map(m => { const items = store.jobs.filter(j => j.stage !== 'delivered' && (j.assignedTeam.includes(m.name) || j.assignedTeam.includes(m.nameEn))); return { ...m, count: items.length }; });
-    const maxLoad = Math.max(...workload.map(w => w.count), 1);
+    const userName = useCallback((id: string | null): string => {
+        if (!id) return ar ? '\u063a\u064a\u0631 \u0645\u0639\u064a\u0646' : 'Unassigned';
+        const u = users.find((us: UserData) => us.id === id);
+        if (!u) return id;
+        return ar ? (u.nameAr || u.name) : u.name;
+    }, [users, ar]);
 
-    // Client name helper
-    const cn = (id: string) => clients.find(c => c.clientId === id)?.name || id;
+    /* ── KPIs ── */
+    const kpis = useMemo(() => {
+        const now = new Date();
+        const active = jobs.filter(j => j.status !== 'delivered' && j.status !== 'pending').length;
+        const scheduled = jobs.filter(j => j.status === 'scheduled').length;
+        const inReview = jobs.filter(j => j.status === 'review').length;
+        const delivered = jobs.filter(j => j.status === 'delivered').length;
+        const overdue = jobs.filter(j => {
+            if (!j.dueDate || j.status === 'delivered') return false;
+            return new Date(j.dueDate) < now;
+        }).length;
+        return { active, scheduled, inReview, delivered, overdue };
+    }, [jobs]);
 
-    const sJob = selectedJob ? store.getJob(selectedJob) : null;
-    const sCamp = selectedCampaign ? store.getCampaign(selectedCampaign) : null;
-    const sSb = showStoryboard ? store.getStoryboard(showStoryboard) : null;
+    /* ── Campaigns with job counts ── */
+    const campaignsWithCounts = useMemo(() => {
+        return campaigns.map((c: CampaignData) => {
+            const campJobs = jobs.filter(j => j.campaignId === c.id);
+            const doneJobs = campJobs.filter(j => j.status === 'delivered').length;
+            const progress = campJobs.length > 0 ? Math.round((doneJobs / campJobs.length) * 100) : 0;
+            return { ...c, jobCount: campJobs.length, doneCount: doneJobs, progress };
+        });
+    }, [campaigns, jobs]);
 
+    /* ── Calendar ── */
+    const calendarData = useMemo(() => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const firstDayOfWeek = new Date(year, month, 1).getDay();
+        const dayNames = ar
+            ? ['\u0623\u062d\u062f', '\u0625\u062b\u0646', '\u062b\u0644\u0627', '\u0623\u0631\u0628', '\u062e\u0645\u064a', '\u062c\u0645\u0639', '\u0633\u0628\u062a']
+            : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const monthLabel = now.toLocaleDateString(ar ? 'ar-SA' : 'en-US', { month: 'long', year: 'numeric' });
 
+        // Build events by day number
+        const eventsByDay: Record<number, { id: string; title: string; color: string }[]> = {};
+        for (const job of jobs) {
+            if (!job.shootDate) continue;
+            const d = new Date(job.shootDate);
+            if (d.getFullYear() === year && d.getMonth() === month) {
+                const day = d.getDate();
+                if (!eventsByDay[day]) eventsByDay[day] = [];
+                eventsByDay[day].push({
+                    id: job.id,
+                    title: job.title,
+                    color: STAGE_META[job.status]?.color || '#6b7280',
+                });
+            }
+        }
+        // Also add jobs by dueDate
+        for (const job of jobs) {
+            if (!job.dueDate) continue;
+            const d = new Date(job.dueDate);
+            if (d.getFullYear() === year && d.getMonth() === month) {
+                const day = d.getDate();
+                if (!eventsByDay[day]) eventsByDay[day] = [];
+                // Avoid duplicates if shootDate and dueDate are same day
+                if (!eventsByDay[day].some(e => e.id === job.id)) {
+                    eventsByDay[day].push({
+                        id: `${job.id}-due`,
+                        title: `${ar ? '\u062a\u0633\u0644\u064a\u0645' : 'Due'}: ${job.title}`,
+                        color: '#dc2626',
+                    });
+                }
+            }
+        }
 
-    // Create job handler
-    const handleCreateJob = () => {
-        store.createJob({ title: newJob.title, clientId: newJob.clientId, campaignId: newJob.campaignId || undefined, linkedMarketingTaskId: '', linkedCreativeRequestId: newJob.linkedCreativeRequestId, category: newJob.category, platform: newJob.platform, deliverableType: '', objective: '', approvedConceptSummary: '', shotList: [], location: '', talent: [], equipmentNotes: '', deadline: newJob.deadline, owner: newJob.owner, assignedTeam: [newJob.owner], stage: 'awaiting_concept', cdPrelimApproval: false, amFinalApproval: false, blocked: false, blockReason: '', finalDeliverable: undefined, exportPackage: undefined, storyboardId: undefined }, lang);
-        setShowNewJob(false);
-        setNewJob({ title: '', clientId: 'client_warda', campaignId: '', category: 'reel_filming', platform: 'Instagram', owner: 'عمر', deadline: '', linkedCreativeRequestId: '' });
-    };
+        return { year, month, daysInMonth, firstDayOfWeek, dayNames, monthLabel, eventsByDay };
+    }, [jobs, ar]);
+
+    /* ── Workload ── */
+    const workloadData = useMemo(() => {
+        const activeJobs = jobs.filter(j => j.status !== 'delivered');
+        const countMap: Record<string, number> = {};
+        for (const job of activeJobs) {
+            if (job.assigneeId) {
+                countMap[job.assigneeId] = (countMap[job.assigneeId] || 0) + 1;
+            }
+        }
+        const result = users
+            .filter((u: UserData) => countMap[u.id] !== undefined || u.department === 'production' || u.department === 'Production')
+            .map((u: UserData) => ({
+                id: u.id,
+                name: ar ? (u.nameAr || u.name) : u.name,
+                role: ar ? (u.positionAr || u.position || u.roleAr || u.role) : (u.position || u.role),
+                avatar: u.avatar || u.name.charAt(0).toUpperCase(),
+                count: countMap[u.id] || 0,
+            }));
+        // Sort by count descending
+        result.sort((a, b) => b.count - a.count);
+        return result;
+    }, [users, jobs, ar]);
+
+    const maxLoad = useMemo(() => Math.max(...workloadData.map(w => w.count), 1), [workloadData]);
+
+    /* ── Alerts: overdue and urgent jobs ── */
+    const alertJobs = useMemo(() => {
+        const now = new Date();
+        return jobs.filter(j => {
+            if (j.status === 'delivered') return false;
+            if (j.priority === 'urgent') return true;
+            if (j.dueDate && new Date(j.dueDate) < now) return true;
+            return false;
+        });
+    }, [jobs]);
+
+    /* ── Selected job for detail drawer ── */
+    const selectedJob = useMemo(() => {
+        if (!selectedJobId) return null;
+        return jobs.find(j => j.id === selectedJobId) || null;
+    }, [jobs, selectedJobId]);
+
+    /* ── Toast helper ── */
+    const showToast = useCallback((msg: string) => {
+        setToast(msg);
+        setTimeout(() => setToast(''), 3000);
+    }, []);
+
+    /* ── Create job handler ── */
+    const handleCreateJob = useCallback(async () => {
+        if (!newJob.title.trim()) return;
+        setCreating(true);
+        const body: Partial<ProductionJobData> = {
+            title: newJob.title,
+            titleAr: newJob.titleAr || newJob.title,
+            clientId: newJob.clientId || undefined,
+            campaignId: newJob.campaignId || undefined,
+            jobType: newJob.jobType,
+            priority: newJob.priority,
+            status: 'pending',
+            assigneeId: newJob.assigneeId || undefined,
+            assignedTo: newJob.assigneeId ? userName(newJob.assigneeId) : '',
+            shootDate: newJob.shootDate || undefined,
+            dueDate: newJob.dueDate || undefined,
+            location: newJob.location,
+            equipment: newJob.equipment ? JSON.stringify(newJob.equipment.split(',').map(s => s.trim()).filter(Boolean)) : '[]',
+            deliverables: newJob.deliverables ? JSON.stringify(newJob.deliverables.split(',').map(s => s.trim()).filter(Boolean)) : '[]',
+        };
+
+        const res = await createJob(body);
+        setCreating(false);
+        if (!res.error) {
+            showToast(ar ? '\u062a\u0645 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0647\u0645\u0629 \u0628\u0646\u062c\u0627\u062d' : 'Job created successfully');
+            setShowNewJob(false);
+            setNewJob(EMPTY_FORM);
+        } else {
+            showToast(ar ? '\u0641\u0634\u0644 \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0647\u0645\u0629' : 'Failed to create job');
+        }
+    }, [newJob, createJob, showToast, ar, userName]);
+
+    /* ── Stage change handler ── */
+    const handleStageChange = useCallback(async (jobId: string, newStatus: string) => {
+        const res = await updateJob(jobId, { status: newStatus });
+        if (!res.error) {
+            const label = ar ? STAGE_META[newStatus]?.ar : STAGE_META[newStatus]?.en;
+            showToast(ar ? `\u062a\u0645 \u0627\u0644\u0646\u0642\u0644 \u0625\u0644\u0649 ${label}` : `Moved to ${label}`);
+        }
+    }, [updateJob, showToast, ar]);
+
+    /* ═══════════════════════════════════════════════════════
+       Render
+       ═══════════════════════════════════════════════════════ */
 
     return (
         <div className={s.board} dir="rtl">
             {/* ── Header ── */}
             <header className={s.header}>
                 <div className={s.headerRight}>
-                    <div className={s.logo}><div className={s.logoIcon}>R</div><span className={s.logoText}>Remark</span></div>
-                    <div className={s.boardTitle}><div className={s.boardDot} /><h1 className={s.boardName}>{ar ? 'الإنتاج' : 'Production'}</h1></div>
+                    <div className={s.logo}>
+                        <div className={s.logoIcon}>R</div>
+                        <span className={s.logoText}>Remark</span>
+                    </div>
+                    <div className={s.boardTitle}>
+                        <div className={s.boardDot} />
+                        <h1 className={s.boardName}>{ar ? '\u0627\u0644\u0625\u0646\u062a\u0627\u062c' : 'Production'}</h1>
+                    </div>
                 </div>
                 <div className={s.headerLeft}>
-                    <button className={s.iconBtn} onClick={toggleTheme}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg></button>
-                    <button className={s.iconBtn} onClick={toggleLang}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></button>
-                    <div className={s.userAvatar}>م.خ</div>
+                    <button className={s.iconBtn} onClick={toggleTheme}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    </button>
+                    <button className={s.iconBtn} onClick={toggleLang}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="2" y1="12" x2="22" y2="12" />
+                            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+                        </svg>
+                    </button>
+                    <div className={s.userAvatar}>{'\u0645.\u062e'}</div>
                     <div className={s.headerDivider} />
                     <div className={s.navSwitcher}>
-                        <Link href="/" className={s.navInactive}>📋 {ar ? 'التسويق' : 'Marketing'}</Link>
-                        <Link href="/creative" className={s.navInactive}>🎨 {ar ? 'الإبداعي' : 'Creative'}</Link>
-                        <span className={s.navActive}>🎬 {ar ? 'الإنتاج' : 'Production'}</span>
-                        <Link href="/publishing" className={s.navInactive}>📢 {ar ? 'النشر' : 'Publishing'}</Link>
+                        <Link href="/" className={s.navInactive}>{'\uD83D\uDCCB'} {ar ? '\u0627\u0644\u062a\u0633\u0648\u064a\u0642' : 'Marketing'}</Link>
+                        <Link href="/creative" className={s.navInactive}>{'\uD83C\uDFA8'} {ar ? '\u0627\u0644\u0625\u0628\u062f\u0627\u0639\u064a' : 'Creative'}</Link>
+                        <span className={s.navActive}>{'\uD83C\uDFAC'} {ar ? '\u0627\u0644\u0625\u0646\u062a\u0627\u062c' : 'Production'}</span>
+                        <Link href="/publishing" className={s.navInactive}>{'\uD83D\uDCE2'} {ar ? '\u0627\u0644\u0646\u0634\u0631' : 'Publishing'}</Link>
                     </div>
                 </div>
             </header>
 
             <main className={s.content}>
+                {/* ── Loading State ── */}
+                {loading && (
+                    <div className={s.kpiGrid}>
+                        {Array.from({ length: 5 }).map((_, i) => (
+                            <div key={i} className={s.kpiCard} style={{ opacity: 0.5 }}>
+                                <div className={s.kpiValue}>--</div>
+                                <div className={s.kpiLabel}>{ar ? '\u062c\u0627\u0631\u064a \u0627\u0644\u062a\u062d\u0645\u064a\u0644...' : 'Loading...'}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* ── Error State ── */}
+                {globalError && (
+                    <div className={s.alertCard}>
+                        <span className={s.alertIcon}>{'\u26A0\uFE0F'}</span>
+                        <span style={{ flex: 1 }}>
+                            {ar ? '\u062e\u0637\u0623 \u0641\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a' : 'Error loading data'}: {globalError}
+                        </span>
+                    </div>
+                )}
+
                 {/* ── KPIs ── */}
-                <div className={s.kpiGrid}>
-                    {[
-                        { v: kpis.activeJobs, l: ar ? 'مهام نشطة' : 'Active Jobs' },
-                        { v: kpis.scheduledShoots, l: ar ? 'تصوير مجدول' : 'Scheduled' },
-                        { v: kpis.editing, l: ar ? 'مونتاج' : 'Editing' },
-                        { v: kpis.blocked, l: ar ? 'محظور' : 'Blocked' },
-                        { v: kpis.awaitingApprovals, l: ar ? 'بانتظار موافقة' : 'Awaiting Approval' },
-                        { v: kpis.readyForDelivery, l: ar ? 'جاهز للتسليم' : 'Ready' },
-                        { v: kpis.overdue, l: ar ? 'متأخر' : 'Overdue' },
-                        { v: `${kpis.onTimeRate}%`, l: ar ? 'معدل التسليم' : 'On-time Rate' },
-                    ].map((k, i) => (
-                        <div key={i} className={s.kpiCard}><div className={s.kpiValue}>{k.v}</div><div className={s.kpiLabel}>{k.l}</div></div>
-                    ))}
-                </div>
-
-                {/* ── Campaigns ── */}
-                <div className={s.sectionHeader}>
-                    <span className={s.sectionTitle}>🎬 {ar ? 'الحملات' : 'Campaigns'}</span>
-                    <div className={s.sectionLine} />
-                    <span className={s.sectionCount}>{store.campaigns.length} {ar ? 'حملة' : 'campaigns'}</span>
-                </div>
-                <div className={s.campaignGrid}>
-                    {store.campaigns.map(c => {
-                        const cJobs = store.getCampaignJobs(c.campaignId);
-                        const doneJobs = cJobs.filter(j => j.stage === 'delivered').length;
-                        return (
-                            <div key={c.campaignId} className={s.campaignCard} onClick={() => setSelectedCampaign(c.campaignId)}>
-                                <div className={s.campHeader}>
-                                    <div><div className={s.campName}>{c.name}</div><div className={s.campClient}>{cn(c.clientId)}</div></div>
-                                    <span className={`${s.campBadge} ${c.status === 'complete' ? s.campBadgeGreen : c.status === 'in_production' ? s.campBadgeYellow : s.campBadgePurple}`}>{ar ? (c.status === 'planning' ? 'تخطيط' : c.status === 'in_production' ? 'إنتاج' : c.status === 'review' ? 'مراجعة' : 'مكتمل') : c.status}</span>
-                                </div>
-                                <div className={s.campBadges}>
-                                    <span className={s.campBadge}>📦 {c.deliverablesList.length} {ar ? 'مخرج' : 'deliverables'}</span>
-                                    <span className={s.campBadge}>🎬 {cJobs.length} {ar ? 'مهمة' : 'jobs'}</span>
-                                    <span className={s.campBadge}>✅ {doneJobs}/{cJobs.length}</span>
-                                    {c.storyboardId && <span className={`${s.campBadge} ${s.campBadgePurple}`}>📋 {ar ? 'ستوري بورد' : 'Storyboard'}</span>}
-                                </div>
-                                <div className={s.approvalRow}>
-                                    <span className={`${s.approvalBadge} ${c.cdApproval ? s.approvalOk : s.approvalPending}`}>{c.cdApproval ? '✅' : '⏳'} {ar ? 'المدير الإبداعي' : 'CD'}</span>
-                                    <span className={`${s.approvalBadge} ${c.amApproval ? s.approvalOk : s.approvalPending}`}>{c.amApproval ? '✅' : '⏳'} {ar ? 'مدير الحسابات' : 'AM'}</span>
-                                </div>
-                                <div className={s.campProgress}><div className={s.campProgressFill} style={{ width: `${c.progress}%` }} /></div>
+                {!loading && (
+                    <div className={s.kpiGrid}>
+                        {[
+                            { v: kpis.active,    l: ar ? '\u0645\u0647\u0627\u0645 \u0646\u0634\u0637\u0629' : 'Active Jobs' },
+                            { v: kpis.scheduled, l: ar ? '\u062a\u0635\u0648\u064a\u0631 \u0645\u062c\u062f\u0648\u0644' : 'Scheduled' },
+                            { v: kpis.inReview,  l: ar ? '\u0642\u064a\u062f \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629' : 'In Review' },
+                            { v: kpis.delivered, l: ar ? '\u062a\u0645 \u0627\u0644\u062a\u0633\u0644\u064a\u0645' : 'Delivered' },
+                            { v: kpis.overdue,   l: ar ? '\u0645\u062a\u0623\u062e\u0631' : 'Overdue' },
+                        ].map((k, i) => (
+                            <div key={i} className={s.kpiCard}>
+                                <div className={s.kpiValue}>{k.v}</div>
+                                <div className={s.kpiLabel}>{k.l}</div>
                             </div>
-                        );
-                    })}
-                </div>
+                        ))}
+                    </div>
+                )}
 
-                {/* ── New Job Button ── */}
-                <div className={s.sectionHeader}>
-                    <span className={s.sectionTitle}>📌 {ar ? 'مهام الإنتاج' : 'Production Jobs'}</span>
-                    <div className={s.sectionLine} />
-                    <span className={s.sectionCount}>{store.jobs.length} {ar ? 'مهمة' : 'jobs'}</span>
-                    <button className={s.btnPrimary} onClick={() => setShowNewJob(true)}>+ {ar ? 'مهمة جديدة' : 'New Job'}</button>
-                </div>
-
-                {/* ── Pipeline ── */}
-                <div className={s.pipelineCols}>
-                    {PROD_STAGES.map(stage => {
-                        const sm = PROD_STAGE_META[stage];
-                        const stageJobs = store.jobs.filter(j => j.stage === stage);
-                        return (
-                            <div key={stage} className={s.pipelineCol}>
-                                <div className={s.pipelineColHeader}>
-                                    <div className={s.pipelineColDot} style={{ background: sm.color }} />
-                                    <span>{ar ? sm.ar : sm.en}</span>
-                                    <span className={s.pipelineColCount}>{stageJobs.length}</span>
-                                </div>
-                                {stageJobs.map(j => (
-                                    <div key={j.productionJobId} className={s.pipelineJobCard} onClick={() => setSelectedJob(j.productionJobId)} style={j.blocked ? { borderColor: 'rgba(220,38,38,.4)' } : undefined}>
-                                        <div className={s.pipelineJobTitle}>{JOB_CAT_ICON[j.category]} {j.title}</div>
-                                        <div className={s.pipelineJobMeta}>{cn(j.clientId)} • {ar ? catL[j.category] : catL[j.category]}</div>
-                                        {j.blocked && <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>⛔ {j.blockReason}</div>}
+                {/* ── Campaigns Section ── */}
+                {!loading && (
+                    <>
+                        <div className={s.sectionHeader}>
+                            <span className={s.sectionTitle}>{'\uD83C\uDFAC'} {ar ? '\u0627\u0644\u062d\u0645\u0644\u0627\u062a' : 'Campaigns'}</span>
+                            <div className={s.sectionLine} />
+                            <span className={s.sectionCount}>
+                                {campaigns.length} {ar ? '\u062d\u0645\u0644\u0629' : 'campaigns'}
+                            </span>
+                        </div>
+                        <div className={s.campaignGrid}>
+                            {campaignsWithCounts.map(c => (
+                                <div key={c.id} className={s.campaignCard}>
+                                    <div className={s.campHeader}>
+                                        <div>
+                                            <div className={s.campName}>{ar ? (c.nameAr || c.name) : c.name}</div>
+                                            <div className={s.campClient}>{clientName(c.clientId)}</div>
+                                        </div>
+                                        <span className={`${s.campBadge} ${
+                                            c.status === 'completed' || c.status === 'complete'
+                                                ? s.campBadgeGreen
+                                                : c.status === 'active' || c.status === 'in_production'
+                                                    ? s.campBadgeYellow
+                                                    : s.campBadgePurple
+                                        }`}>
+                                            {ar
+                                                ? (c.status === 'planning' ? '\u062a\u062e\u0637\u064a\u0637'
+                                                    : c.status === 'active' || c.status === 'in_production' ? '\u0625\u0646\u062a\u0627\u062c'
+                                                    : c.status === 'review' ? '\u0645\u0631\u0627\u062c\u0639\u0629'
+                                                    : c.status === 'completed' || c.status === 'complete' ? '\u0645\u0643\u062a\u0645\u0644'
+                                                    : c.status)
+                                                : c.status
+                                            }
+                                        </span>
                                     </div>
+                                    <div className={s.campBadges}>
+                                        <span className={s.campBadge}>
+                                            {'\uD83C\uDFAC'} {c.jobCount} {ar ? '\u0645\u0647\u0645\u0629' : 'jobs'}
+                                        </span>
+                                        <span className={s.campBadge}>
+                                            {'\u2705'} {c.doneCount}/{c.jobCount}
+                                        </span>
+                                    </div>
+                                    <div className={s.campProgress}>
+                                        <div className={s.campProgressFill} style={{ width: `${c.progress}%` }} />
+                                    </div>
+                                </div>
+                            ))}
+                            {campaigns.length === 0 && (
+                                <div className={s.campaignCard} style={{ opacity: 0.6, textAlign: 'center' }}>
+                                    <div className={s.campName}>{ar ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u062d\u0645\u0644\u0627\u062a' : 'No campaigns yet'}</div>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {/* ── Filter Bar + New Job Button ── */}
+                {!loading && (
+                    <>
+                        <div className={s.sectionHeader}>
+                            <span className={s.sectionTitle}>{'\uD83D\uDCCC'} {ar ? '\u0645\u0647\u0627\u0645 \u0627\u0644\u0625\u0646\u062a\u0627\u062c' : 'Production Jobs'}</span>
+                            <div className={s.sectionLine} />
+                            <span className={s.sectionCount}>{filteredJobs.length} {ar ? '\u0645\u0647\u0645\u0629' : 'jobs'}</span>
+                            <button className={s.btnPrimary} onClick={() => setShowNewJob(true)}>
+                                + {ar ? '\u0645\u0647\u0645\u0629 \u062c\u062f\u064a\u062f\u0629' : 'New Job'}
+                            </button>
+                        </div>
+
+                        {/* Filter Dropdowns */}
+                        <div className={s.actionRow}>
+                            {/* Client Filter */}
+                            <select
+                                className={s.modalSelect}
+                                style={{ width: 'auto', minWidth: 140 }}
+                                value={filters.clientId}
+                                onChange={e => setFilters(prev => ({ ...prev, clientId: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u0643\u0644 \u0627\u0644\u0639\u0645\u0644\u0627\u0621' : 'All Clients'}</option>
+                                {clients.map((c: ClientData) => (
+                                    <option key={c.id} value={c.id}>{ar ? (c.nameAr || c.name) : c.name}</option>
                                 ))}
-                            </div>
-                        );
-                    })}
-                </div>
+                            </select>
+
+                            {/* Job Type Filter */}
+                            <select
+                                className={s.modalSelect}
+                                style={{ width: 'auto', minWidth: 120 }}
+                                value={filters.jobType}
+                                onChange={e => setFilters(prev => ({ ...prev, jobType: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u0643\u0644 \u0627\u0644\u0623\u0646\u0648\u0627\u0639' : 'All Types'}</option>
+                                {Object.entries(JOB_TYPE_LABELS).map(([key, label]) => (
+                                    <option key={key} value={key}>{JOB_TYPE_ICONS[key]} {ar ? label.ar : label.en}</option>
+                                ))}
+                            </select>
+
+                            {/* Priority Filter */}
+                            <select
+                                className={s.modalSelect}
+                                style={{ width: 'auto', minWidth: 120 }}
+                                value={filters.priority}
+                                onChange={e => setFilters(prev => ({ ...prev, priority: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u0643\u0644 \u0627\u0644\u0623\u0648\u0644\u0648\u064a\u0627\u062a' : 'All Priorities'}</option>
+                                {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
+                                    <option key={key} value={key}>{ar ? label.ar : label.en}</option>
+                                ))}
+                            </select>
+
+                            {/* Status Filter */}
+                            <select
+                                className={s.modalSelect}
+                                style={{ width: 'auto', minWidth: 120 }}
+                                value={filters.status}
+                                onChange={e => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u0643\u0644 \u0627\u0644\u0645\u0631\u0627\u062d\u0644' : 'All Stages'}</option>
+                                {PIPELINE_STAGES.map(st => (
+                                    <option key={st} value={st}>{ar ? STAGE_META[st].ar : STAGE_META[st].en}</option>
+                                ))}
+                            </select>
+
+                            {/* Clear Filters */}
+                            {(filters.clientId || filters.jobType || filters.priority || filters.status) && (
+                                <button
+                                    className={s.actionBtn}
+                                    onClick={() => setFilters(EMPTY_FILTERS)}
+                                >
+                                    {'\u2715'} {ar ? '\u0645\u0633\u062d \u0627\u0644\u0641\u0644\u0627\u062a\u0631' : 'Clear'}
+                                </button>
+                            )}
+                        </div>
+                    </>
+                )}
+
+                {/* ── Pipeline Columns ── */}
+                {!loading && (
+                    <div className={s.pipelineCols}>
+                        {PIPELINE_STAGES.map(stage => {
+                            const meta = STAGE_META[stage];
+                            const stageJobs = filteredJobs.filter(j => j.status === stage);
+                            return (
+                                <div key={stage} className={s.pipelineCol}>
+                                    <div className={s.pipelineColHeader}>
+                                        <div className={s.pipelineColDot} style={{ background: meta.color }} />
+                                        <span>{ar ? meta.ar : meta.en}</span>
+                                        <span className={s.pipelineColCount}>{stageJobs.length}</span>
+                                    </div>
+                                    {stageJobs.map(j => {
+                                        const isOverdue = j.dueDate && j.status !== 'delivered' && new Date(j.dueDate) < new Date();
+                                        return (
+                                            <div
+                                                key={j.id}
+                                                className={s.pipelineJobCard}
+                                                onClick={() => setSelectedJobId(j.id)}
+                                                style={isOverdue ? { borderColor: 'rgba(220,38,38,.4)' } : undefined}
+                                            >
+                                                <div className={s.pipelineJobTitle}>
+                                                    {JOB_TYPE_ICONS[j.jobType] || '\uD83C\uDFAC'} {ar ? (j.titleAr || j.title) : j.title}
+                                                </div>
+                                                <div className={s.pipelineJobMeta}>
+                                                    {clientName(j.clientId)}
+                                                    {' \u2022 '}
+                                                    {ar ? (JOB_TYPE_LABELS[j.jobType]?.ar || j.jobType) : (JOB_TYPE_LABELS[j.jobType]?.en || j.jobType)}
+                                                </div>
+                                                {j.priority === 'urgent' && (
+                                                    <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2, fontWeight: 600 }}>
+                                                        {'\uD83D\uDD34'} {ar ? '\u0639\u0627\u062c\u0644' : 'Urgent'}
+                                                    </div>
+                                                )}
+                                                {isOverdue && (
+                                                    <div style={{ fontSize: 10, color: '#dc2626', marginTop: 2 }}>
+                                                        {'\u26D4'} {ar ? '\u0645\u062a\u0623\u062e\u0631' : 'Overdue'}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                    {stageJobs.length === 0 && (
+                                        <div style={{ fontSize: 11, color: 'var(--text-muted)', textAlign: 'center', padding: 12 }}>
+                                            {ar ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0647\u0627\u0645' : 'No jobs'}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
 
                 {/* ── Calendar ── */}
-                <div className={s.sectionHeader}>
-                    <span className={s.sectionTitle}>📅 {ar ? 'تقويم الإنتاج' : 'Production Calendar'}</span>
-                    <div className={s.sectionLine} />
-                    <span className={s.sectionCount}>{now.toLocaleDateString(ar ? 'ar-SA' : 'en-US', { month: 'long', year: 'numeric' })}</span>
-                </div>
-                <div className={s.calGrid}>
-                    {dn.map(d => <div key={d} className={s.calHeader}>{d}</div>)}
-                    {Array.from({ length: fdw }).map((_, i) => <div key={`e${i}`} className={s.calEmpty} />)}
-                    {Array.from({ length: dim }).map((_, i) => {
-                        const day = i + 1; const evts = evDay(day);
-                        return (
-                            <div key={day} className={s.calDay}>
-                                <div className={s.calDayNum}>{day}</div>
-                                {evts.map(ev => <div key={ev.id} className={s.calEvent} style={{ background: ev.color }}>{ev.title}</div>)}
-                            </div>
-                        );
-                    })}
-                </div>
+                {!loading && (
+                    <>
+                        <div className={s.sectionHeader}>
+                            <span className={s.sectionTitle}>{'\uD83D\uDCC5'} {ar ? '\u062a\u0642\u0648\u064a\u0645 \u0627\u0644\u0625\u0646\u062a\u0627\u062c' : 'Production Calendar'}</span>
+                            <div className={s.sectionLine} />
+                            <span className={s.sectionCount}>{calendarData.monthLabel}</span>
+                        </div>
+                        <div className={s.calGrid}>
+                            {calendarData.dayNames.map(d => (
+                                <div key={d} className={s.calHeader}>{d}</div>
+                            ))}
+                            {Array.from({ length: calendarData.firstDayOfWeek }).map((_, i) => (
+                                <div key={`empty-${i}`} className={s.calEmpty} />
+                            ))}
+                            {Array.from({ length: calendarData.daysInMonth }).map((_, i) => {
+                                const day = i + 1;
+                                const events = calendarData.eventsByDay[day] || [];
+                                return (
+                                    <div key={day} className={s.calDay}>
+                                        <div className={s.calDayNum}>{day}</div>
+                                        {events.map(ev => (
+                                            <div key={ev.id} className={s.calEvent} style={{ background: ev.color }}>
+                                                {ev.title}
+                                            </div>
+                                        ))}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
 
                 {/* ── Team Workload ── */}
-                <div className={s.sectionHeader}><span className={s.sectionTitle}>👥 {ar ? 'حمل الفريق' : 'Team Workload'}</span><div className={s.sectionLine} /></div>
-                <div className={s.teamGrid}>
-                    {workload.map(m => (
-                        <div key={m.id} className={s.teamCard}>
-                            <div className={s.teamAvatar} style={{ background: `${m.color}20` }}>{m.avatar}</div>
-                            <div style={{ flex: 1 }}>
-                                <div className={s.teamName}>{ar ? m.name : m.nameEn}</div>
-                                <div className={s.teamRole}>{ar ? m.role : m.roleEn}</div>
-                                <div className={s.teamBar}><div className={s.teamBarFill} style={{ width: `${(m.count / maxLoad) * 100}%`, background: m.color }} /></div>
-                            </div>
-                            <div className={s.teamCount}>{m.count}</div>
+                {!loading && (
+                    <>
+                        <div className={s.sectionHeader}>
+                            <span className={s.sectionTitle}>{'\uD83D\uDC65'} {ar ? '\u062d\u0645\u0644 \u0627\u0644\u0641\u0631\u064a\u0642' : 'Team Workload'}</span>
+                            <div className={s.sectionLine} />
                         </div>
-                    ))}
-                </div>
+                        <div className={s.teamGrid}>
+                            {workloadData.map(m => (
+                                <div key={m.id} className={s.teamCard}>
+                                    <div className={s.teamAvatar} style={{ background: 'rgba(99,102,241,0.12)' }}>
+                                        {m.avatar}
+                                    </div>
+                                    <div style={{ flex: 1 }}>
+                                        <div className={s.teamName}>{m.name}</div>
+                                        <div className={s.teamRole}>{m.role}</div>
+                                        <div className={s.teamBar}>
+                                            <div
+                                                className={s.teamBarFill}
+                                                style={{
+                                                    width: `${(m.count / maxLoad) * 100}%`,
+                                                    background: m.count > maxLoad * 0.8 ? '#dc2626' : '#6366f1',
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className={s.teamCount}>{m.count}</div>
+                                </div>
+                            ))}
+                            {workloadData.length === 0 && (
+                                <div className={s.teamCard} style={{ opacity: 0.6, justifyContent: 'center' }}>
+                                    <span style={{ fontSize: 13 }}>{ar ? '\u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u064a\u0627\u0646\u0627\u062a \u062d\u0645\u0644 \u0627\u0644\u0639\u0645\u0644' : 'No workload data'}</span>
+                                </div>
+                            )}
+                        </div>
+                    </>
+                )}
 
-                {/* ── Activity Feed ── */}
-                <div className={s.sectionHeader}><span className={s.sectionTitle}>📢 {ar ? 'آخر الأحداث' : 'Activity Feed'}</span><div className={s.sectionLine} /></div>
-                <div className={s.activityList}>
-                    {store.activities.slice(0, 10).map(a => (
-                        <div key={a.id} className={s.activityItem}>
-                            <span className={s.activityIcon}>{a.icon}</span>
-                            <span className={s.activityText}>{ar ? a.text : a.textEn}</span>
-                            <span className={s.activityTime}>{a.time}</span>
+                {/* ── Alerts: Overdue + Urgent ── */}
+                {!loading && alertJobs.length > 0 && (
+                    <>
+                        <div className={s.sectionHeader}>
+                            <span className={s.sectionTitle}>{'\uD83D\uDEA8'} {ar ? '\u062a\u0646\u0628\u064a\u0647\u0627\u062a' : 'Alerts'}</span>
+                            <div className={s.sectionLine} />
+                            <span className={s.sectionCount}>{alertJobs.length}</span>
                         </div>
-                    ))}
-                </div>
-
-                {/* ── Alerts ── */}
-                {store.jobs.filter(j => j.blocked).length > 0 && <>
-                    <div className={s.sectionHeader}><span className={s.sectionTitle}>🚨 {ar ? 'تنبيهات' : 'Alerts'}</span><div className={s.sectionLine} /></div>
-                    {store.jobs.filter(j => j.blocked).map(j => (
-                        <div key={j.productionJobId} className={s.alertCard}>
-                            <span className={s.alertIcon}>⛔</span>
-                            <span style={{ flex: 1 }}>{j.title} — {j.blockReason}</span>
-                            <button className={s.actionBtn} onClick={() => { store.unblock(j.productionJobId, lang); }}>✅ {ar ? 'رفع الحظر' : 'Unblock'}</button>
-                        </div>
-                    ))}
-                </>}
+                        {alertJobs.map(j => {
+                            const isOverdue = j.dueDate && new Date(j.dueDate) < new Date();
+                            return (
+                                <div key={j.id} className={s.alertCard}>
+                                    <span className={s.alertIcon}>{isOverdue ? '\u26D4' : '\uD83D\uDD34'}</span>
+                                    <span style={{ flex: 1 }}>
+                                        {JOB_TYPE_ICONS[j.jobType] || ''} {ar ? (j.titleAr || j.title) : j.title}
+                                        {' \u2014 '}
+                                        {isOverdue
+                                            ? (ar ? '\u0645\u062a\u0623\u062e\u0631' : 'Overdue')
+                                            : (ar ? '\u0639\u0627\u062c\u0644' : 'Urgent')
+                                        }
+                                        {j.dueDate && (
+                                            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginRight: 6 }}>
+                                                {' \u2022 '}{ar ? '\u0627\u0644\u0645\u0648\u0639\u062f' : 'Due'}: {new Date(j.dueDate).toLocaleDateString(ar ? 'ar-SA' : 'en-US')}
+                                            </span>
+                                        )}
+                                    </span>
+                                    <button
+                                        className={s.actionBtn}
+                                        onClick={() => setSelectedJobId(j.id)}
+                                    >
+                                        {ar ? '\u0639\u0631\u0636' : 'View'}
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </>
+                )}
             </main>
 
             {/* ═══ JOB DETAIL DRAWER ═══ */}
-            {sJob && (
-                <div className={s.modalOverlay} onClick={() => setSelectedJob(null)}>
+            {selectedJob && (
+                <div className={s.modalOverlay} onClick={() => setSelectedJobId(null)}>
                     <div className={s.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
-                        <button className={s.drawerClose} onClick={() => setSelectedJob(null)}>✕</button>
-                        <div className={s.drawerTitle}>{JOB_CAT_ICON[sJob.category]} {sJob.title}</div>
+                        <button className={s.drawerClose} onClick={() => setSelectedJobId(null)}>{'\u2715'}</button>
+                        <div className={s.drawerTitle}>
+                            {JOB_TYPE_ICONS[selectedJob.jobType] || '\uD83C\uDFAC'}{' '}
+                            {ar ? (selectedJob.titleAr || selectedJob.title) : selectedJob.title}
+                        </div>
+
+                        {/* Status & Meta Badges */}
                         <div className={s.campBadges}>
-                            <span className={s.campBadge} style={{ borderColor: PROD_STAGE_META[sJob.stage].color, color: PROD_STAGE_META[sJob.stage].color }}>{ar ? PROD_STAGE_META[sJob.stage].ar : PROD_STAGE_META[sJob.stage].en}</span>
-                            <span className={s.campBadge}>{cn(sJob.clientId)}</span>
-                            {sJob.campaignId && <span className={`${s.campBadge} ${s.campBadgePurple}`}>📦 {store.getCampaign(sJob.campaignId)?.name}</span>}
-                            {sJob.blocked && <span className={`${s.campBadge} ${s.campBadgeRed}`}>⛔ {ar ? 'محظور' : 'Blocked'}</span>}
+                            <span
+                                className={s.campBadge}
+                                style={{
+                                    borderColor: STAGE_META[selectedJob.status]?.color,
+                                    color: STAGE_META[selectedJob.status]?.color,
+                                }}
+                            >
+                                {ar ? STAGE_META[selectedJob.status]?.ar : STAGE_META[selectedJob.status]?.en}
+                            </span>
+                            <span className={s.campBadge}>{clientName(selectedJob.clientId)}</span>
+                            {selectedJob.campaignId && (
+                                <span className={`${s.campBadge} ${s.campBadgePurple}`}>
+                                    {'\uD83D\uDCE6'} {campaignName(selectedJob.campaignId)}
+                                </span>
+                            )}
+                            {selectedJob.priority && (
+                                <span
+                                    className={s.campBadge}
+                                    style={{
+                                        borderColor: PRIORITY_COLORS[selectedJob.priority],
+                                        color: PRIORITY_COLORS[selectedJob.priority],
+                                    }}
+                                >
+                                    {ar ? PRIORITY_LABELS[selectedJob.priority]?.ar : PRIORITY_LABELS[selectedJob.priority]?.en}
+                                </span>
+                            )}
                         </div>
 
-                        {/* Approval Prerequisites */}
+                        {/* Details Section */}
                         <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'شروط الموافقة المسبقة' : 'Approval Prerequisites'}</div>
-                            <div className={s.approvalRow}>
-                                <span className={`${s.approvalBadge} ${sJob.cdPrelimApproval ? s.approvalOk : s.approvalPending}`}>{sJob.cdPrelimApproval ? '✅' : '⏳'} {ar ? 'الموافقة المبدئية — المدير الإبداعي' : 'Preliminary — Creative Director'}</span>
-                                <span className={`${s.approvalBadge} ${sJob.amFinalApproval ? s.approvalOk : s.approvalPending}`}>{sJob.amFinalApproval ? '✅' : '⏳'} {ar ? 'الموافقة النهائية — مدير الحسابات' : 'Final — Account Manager'}</span>
-                            </div>
-                            {(!sJob.cdPrelimApproval || !sJob.amFinalApproval) && <div style={{ marginTop: 6, fontSize: 12, color: '#dc2626', fontWeight: 600 }}>⛔ {ar ? 'لا يمكن المتابعة حتى اكتمال الموافقات المسبقة' : 'Cannot proceed until prerequisite approvals are complete'}</div>}
-                        </div>
-
-                        {/* Info */}
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'التفاصيل' : 'Details'}</div>
-                            <div style={{ fontSize: 13 }}>
-                                <div><strong>{ar ? 'النوع:' : 'Category:'}</strong> {catL[sJob.category]}</div>
-                                <div><strong>{ar ? 'المنصة:' : 'Platform:'}</strong> {sJob.platform}</div>
-                                <div><strong>{ar ? 'الموعد:' : 'Deadline:'}</strong> {sJob.deadline}</div>
-                                <div><strong>{ar ? 'المسؤول:' : 'Owner:'}</strong> {sJob.owner}</div>
-                                <div><strong>{ar ? 'الفريق:' : 'Team:'}</strong> {sJob.assignedTeam.join(', ')}</div>
-                                {sJob.location && <div><strong>{ar ? 'الموقع:' : 'Location:'}</strong> {sJob.location}</div>}
-                                {sJob.approvedConceptSummary && <div><strong>{ar ? 'الفكرة المعتمدة:' : 'Concept:'}</strong> {sJob.approvedConceptSummary}</div>}
+                            <div className={s.drawerLabel}>{ar ? '\u0627\u0644\u062a\u0641\u0627\u0635\u064a\u0644' : 'Details'}</div>
+                            <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                <div>
+                                    <strong>{ar ? '\u0627\u0644\u0646\u0648\u0639:' : 'Type:'}</strong>{' '}
+                                    {JOB_TYPE_ICONS[selectedJob.jobType]}{' '}
+                                    {ar ? JOB_TYPE_LABELS[selectedJob.jobType]?.ar : JOB_TYPE_LABELS[selectedJob.jobType]?.en}
+                                </div>
+                                <div>
+                                    <strong>{ar ? '\u0627\u0644\u0645\u0633\u0624\u0648\u0644:' : 'Assigned to:'}</strong>{' '}
+                                    {selectedJob.assignedTo || userName(selectedJob.assigneeId)}
+                                </div>
+                                {selectedJob.shootDate && (
+                                    <div>
+                                        <strong>{ar ? '\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u062a\u0635\u0648\u064a\u0631:' : 'Shoot Date:'}</strong>{' '}
+                                        {new Date(selectedJob.shootDate).toLocaleDateString(ar ? 'ar-SA' : 'en-US')}
+                                    </div>
+                                )}
+                                {selectedJob.dueDate && (
+                                    <div>
+                                        <strong>{ar ? '\u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0646\u0647\u0627\u0626\u064a:' : 'Due Date:'}</strong>{' '}
+                                        {new Date(selectedJob.dueDate).toLocaleDateString(ar ? 'ar-SA' : 'en-US')}
+                                    </div>
+                                )}
+                                {selectedJob.location && (
+                                    <div>
+                                        <strong>{ar ? '\u0627\u0644\u0645\u0648\u0642\u0639:' : 'Location:'}</strong> {selectedJob.location}
+                                    </div>
+                                )}
+                                {selectedJob.equipment && selectedJob.equipment !== '[]' && (
+                                    <div>
+                                        <strong>{ar ? '\u0627\u0644\u0645\u0639\u062f\u0627\u062a:' : 'Equipment:'}</strong>{' '}
+                                        {parseJsonField<string[]>(selectedJob.equipment, []).join(', ')}
+                                    </div>
+                                )}
+                                {selectedJob.deliverables && selectedJob.deliverables !== '[]' && (
+                                    <div>
+                                        <strong>{ar ? '\u0627\u0644\u0645\u062e\u0631\u062c\u0627\u062a:' : 'Deliverables:'}</strong>{' '}
+                                        {parseJsonField<string[]>(selectedJob.deliverables, []).join(', ')}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
                         {/* Stage Actions */}
                         <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'تغيير المرحلة' : 'Change Stage'}</div>
+                            <div className={s.drawerLabel}>{ar ? '\u062a\u063a\u064a\u064a\u0631 \u0627\u0644\u0645\u0631\u062d\u0644\u0629' : 'Change Stage'}</div>
                             <div className={s.actionRow}>
-                                {PROD_STAGES.map(st => (
-                                    <button key={st} className={`${s.actionBtn} ${sJob.stage === st ? s.btnPrimary : ''} ${(!sJob.cdPrelimApproval && st !== 'awaiting_concept') ? s.disabledBtn : ''}`} onClick={() => store.moveJobToStage(sJob.productionJobId, st, lang)} style={sJob.stage === st ? { background: PROD_STAGE_META[st].color, color: 'white', borderColor: 'transparent' } : undefined}>
-                                        {ar ? PROD_STAGE_META[st].ar : PROD_STAGE_META[st].en}
+                                {PIPELINE_STAGES.map(st => (
+                                    <button
+                                        key={st}
+                                        className={`${s.actionBtn} ${selectedJob.status === st ? s.btnPrimary : ''}`}
+                                        onClick={() => handleStageChange(selectedJob.id, st)}
+                                        style={
+                                            selectedJob.status === st
+                                                ? { background: STAGE_META[st].color, color: 'white', borderColor: 'transparent' }
+                                                : undefined
+                                        }
+                                    >
+                                        {ar ? STAGE_META[st].ar : STAGE_META[st].en}
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Storyboard */}
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'ستوري بورد' : 'Storyboard'}</div>
-                            {sJob.storyboardId ? (
-                                <button className={s.actionBtn} onClick={() => setShowStoryboard(sJob.storyboardId!)}>📋 {ar ? 'عرض الستوري بورد' : 'View Storyboard'}</button>
-                            ) : (
-                                <button className={s.actionBtn} onClick={() => { const sb = store.generateAIStoryboard('job', sJob.productionJobId, sJob.title, lang); setShowStoryboard(sb.storyboardId); }}>🤖 {ar ? 'إنشاء ستوري بورد بالذكاء الاصطناعي' : 'Generate AI Storyboard'}</button>
-                            )}
-                        </div>
-
-                        {/* Media */}
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'الملفات' : 'Media Files'}</div>
-                            <div className={s.mediaList}>
-                                {store.getJobMedia(sJob.productionJobId).map(f => (
-                                    <div key={f.fileId} className={s.mediaItem}>
-                                        <span className={s.mediaIcon}>📁</span>
-                                        <span className={s.mediaName}>{f.name}</span>
-                                        <span className={s.mediaSize}>{f.size}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                                <input className={s.modalInput} style={{ flex: 1 }} placeholder={ar ? 'اسم الملف...' : 'File name...'} value={uploadName} onChange={e => setUploadName(e.target.value)} />
-                                <button className={s.actionBtn} onClick={() => { if (uploadName.trim()) { store.uploadMedia(sJob.productionJobId, uploadName, 'footage', sJob.owner, lang); setUploadName(''); } }}>📤 {ar ? 'رفع' : 'Upload'}</button>
-                            </div>
-                        </div>
-
-                        {/* Versions */}
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'النسخ' : 'Versions'}</div>
-                            <div className={s.versionList}>
-                                {sJob.editVersions.map(v => (
-                                    <div key={v.v} className={s.versionItem}>
-                                        <span className={s.versionLabel}>V{v.v} — {v.label}</span>
-                                        <span className={s.versionDate}>{v.date} • {v.notes}</span>
-                                    </div>
-                                ))}
-                            </div>
-                            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                                <input className={s.modalInput} style={{ flex: 1 }} placeholder={ar ? 'اسم النسخة...' : 'Version label...'} value={versionLabel} onChange={e => setVersionLabel(e.target.value)} />
-                                <button className={s.actionBtn} onClick={() => { if (versionLabel.trim()) { store.addVersion(sJob.productionJobId, versionLabel, '', lang); setVersionLabel(''); } }}>🔄 {ar ? 'إضافة' : 'Add'}</button>
-                            </div>
-                        </div>
-
-                        {/* Export & Navigation */}
+                        {/* Navigation Links */}
                         <div className={s.drawerSection}>
                             <div className={s.actionRow}>
-                                <button className={s.actionBtn} onClick={() => { const pkg = store.exportJobPackage(sJob.productionJobId); if (pkg) { const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sJob.title}_package.json`; a.click(); } }}>📦 {ar ? 'تصدير حزمة المهمة' : 'Export Job Package'}</button>
-                                <Link href={`/production/client/${sJob.clientId}`} className={s.actionBtn}>👤 {ar ? 'مساحة العميل' : 'Client Workspace'}</Link>
-                                {sJob.campaignId && <Link href={`/production/campaign/${sJob.campaignId}`} className={s.actionBtn}>📦 {ar ? 'مساحة الحملة' : 'Campaign Workspace'}</Link>}
+                                {selectedJob.clientId && (
+                                    <Link href={`/production/client/${selectedJob.clientId}`} className={s.actionBtn}>
+                                        {'\uD83D\uDC64'} {ar ? '\u0645\u0633\u0627\u062d\u0629 \u0627\u0644\u0639\u0645\u064a\u0644' : 'Client Workspace'}
+                                    </Link>
+                                )}
+                                {selectedJob.campaignId && (
+                                    <Link href={`/production/campaign/${selectedJob.campaignId}`} className={s.actionBtn}>
+                                        {'\uD83D\uDCE6'} {ar ? '\u0645\u0633\u0627\u062d\u0629 \u0627\u0644\u062d\u0645\u0644\u0629' : 'Campaign Workspace'}
+                                    </Link>
+                                )}
                             </div>
                         </div>
                     </div>
                 </div>
             )}
-
-            {/* ═══ CAMPAIGN DETAIL ═══ */}
-            {sCamp && !sJob && (
-                <div className={s.modalOverlay} onClick={() => setSelectedCampaign(null)}>
-                    <div className={s.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
-                        <button className={s.drawerClose} onClick={() => setSelectedCampaign(null)}>✕</button>
-                        <div className={s.drawerTitle}>📦 {sCamp.name}</div>
-                        <div className={s.campBadges}>
-                            <span className={s.campBadge}>{cn(sCamp.clientId)}</span>
-                            <span className={s.campBadge}>🎯 {sCamp.objective}</span>
-                        </div>
-                        <div className={s.approvalRow}>
-                            <span className={`${s.approvalBadge} ${sCamp.cdApproval ? s.approvalOk : s.approvalPending}`}>{sCamp.cdApproval ? '✅' : '⏳'} {ar ? 'المدير الإبداعي' : 'CD'}</span>
-                            <span className={`${s.approvalBadge} ${sCamp.amApproval ? s.approvalOk : s.approvalPending}`}>{sCamp.amApproval ? '✅' : '⏳'} {ar ? 'مدير الحسابات' : 'AM'}</span>
-                        </div>
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'المخرجات' : 'Deliverables'}</div>
-                            {sCamp.deliverablesList.map((d, i) => <div key={i} className={s.campBadge} style={{ display: 'inline-block', marginLeft: 4, marginTop: 4 }}>📌 {d}</div>)}
-                        </div>
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'مهام الإنتاج' : 'Production Jobs'}</div>
-                            {store.getCampaignJobs(sCamp.campaignId).map(j => (
-                                <div key={j.productionJobId} className={s.pipelineJobCard} onClick={() => { setSelectedJob(j.productionJobId); }}>
-                                    <div className={s.pipelineJobTitle}>{JOB_CAT_ICON[j.category]} {j.title}</div>
-                                    <div className={s.pipelineJobMeta} style={{ color: PROD_STAGE_META[j.stage].color }}>{ar ? PROD_STAGE_META[j.stage].ar : PROD_STAGE_META[j.stage].en}</div>
-                                </div>
-                            ))}
-                        </div>
-                        {/* Storyboard */}
-                        <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'ستوري بورد الحملة' : 'Campaign Storyboard'}</div>
-                            {sCamp.storyboardId ? (
-                                <button className={s.actionBtn} onClick={() => setShowStoryboard(sCamp.storyboardId!)}>📋 {ar ? 'عرض' : 'View'}</button>
-                            ) : (
-                                <button className={s.actionBtn} onClick={() => { const sb = store.generateAIStoryboard('campaign', sCamp.campaignId, sCamp.name, lang); setShowStoryboard(sb.storyboardId); }}>🤖 {ar ? 'إنشاء ستوري بورد AI' : 'Generate AI Storyboard'}</button>
-                            )}
-                        </div>
-                        <div className={s.drawerSection}>
-                            <div className={s.actionRow}>
-                                <button className={s.actionBtn} onClick={() => { const pkg = store.exportCampaignPackage(sCamp.campaignId); if (pkg) { const blob = new Blob([JSON.stringify(pkg, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${sCamp.name}_package.json`; a.click(); } }}>📦 {ar ? 'تصدير حزمة الحملة' : 'Export Campaign'}</button>
-                                <Link href={`/production/client/${sCamp.clientId}`} className={s.actionBtn}>👤 {ar ? 'مساحة العميل' : 'Client Workspace'}</Link>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* ═══ STORYBOARD VIEWER ═══ */}
-            {sSb && (
-                <div className={s.modalOverlay} onClick={() => setShowStoryboard(null)}>
-                    <div className={s.modal} onClick={e => e.stopPropagation()} style={{ maxWidth: 750 }}>
-                        <button className={s.drawerClose} onClick={() => setShowStoryboard(null)}>✕</button>
-                        <div className={s.drawerTitle}>📋 {sSb.title} {sSb.generatedByAI && <span style={{ fontSize: 12, color: '#8b5cf6' }}>🤖 AI</span>}</div>
-                        <div className={s.campBadges}>
-                            <span className={s.campBadge}>V{sSb.version}</span>
-                            <span className={s.campBadge}>{sSb.scenes.length} {ar ? 'مشهد' : 'scenes'}</span>
-                        </div>
-                        <div className={s.sbScenes}>
-                            {sSb.scenes.map(sc => (
-                                <div key={sc.sceneId} className={s.sbScene}>
-                                    <div className={s.sbSceneNum}>{ar ? 'مشهد' : 'Scene'} {sc.order} — {sc.durationSec}s</div>
-                                    <div className={s.sbSceneObj}>{sc.objective}</div>
-                                    <div className={s.sbSceneNotes}>🎥 {sc.visualNotes}</div>
-                                    <div className={s.sbSceneNotes}>📷 {sc.cameraNotes} • {sc.shotType}</div>
-                                    {sc.audioNotes && <div className={s.sbSceneNotes}>🔊 {sc.audioNotes}</div>}
-                                    {sc.textNotes && <div className={s.sbSceneNotes}>📝 {sc.textNotes}</div>}
-                                    {sc.requiredPeople.length > 0 && <div className={s.sbSceneNotes}>👥 {sc.requiredPeople.join(', ')}</div>}
-                                    {sc.locationNotes && <div className={s.sbSceneNotes}>📍 {sc.locationNotes}</div>}
-                                </div>
-                            ))}
-                        </div>
-                        {sSb.comments.length > 0 && <div className={s.drawerSection}>
-                            <div className={s.drawerLabel}>{ar ? 'تعليقات' : 'Comments'}</div>
-                            {sSb.comments.map(c => <div key={c.id} className={s.activityItem}><span>{c.sender}:</span> <span style={{ flex: 1 }}>{c.text}</span> <span className={s.activityTime}>{c.time}</span></div>)}
-                        </div>}
-                    </div>
-                </div>
-            )}
-
 
             {/* ═══ NEW JOB MODAL ═══ */}
             {showNewJob && (
                 <div className={s.modalOverlay} onClick={() => setShowNewJob(false)}>
                     <div className={s.modal} onClick={e => e.stopPropagation()}>
-                        <div className={s.modalTitle}>📌 {ar ? 'مهمة إنتاج جديدة' : 'New Production Job'}</div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'العنوان' : 'Title'}</label><input className={s.modalInput} value={newJob.title} onChange={e => setNewJob({ ...newJob, title: e.target.value })} /></div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'العميل' : 'Client'}</label>
-                            <select className={s.modalSelect} value={newJob.clientId} onChange={e => setNewJob({ ...newJob, clientId: e.target.value })}>
-                                {clients.map(c => <option key={c.clientId} value={c.clientId}>{c.name}</option>)}
+                        <div className={s.modalTitle}>
+                            {'\uD83D\uDCCC'} {ar ? '\u0645\u0647\u0645\u0629 \u0625\u0646\u062a\u0627\u062c \u062c\u062f\u064a\u062f\u0629' : 'New Production Job'}
+                        </div>
+
+                        {/* Title */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0639\u0646\u0648\u0627\u0646 (EN)' : 'Title (EN)'}</label>
+                            <input
+                                className={s.modalInput}
+                                value={newJob.title}
+                                onChange={e => setNewJob(prev => ({ ...prev, title: e.target.value }))}
+                                placeholder={ar ? '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0647\u0645\u0629...' : 'Job title...'}
+                            />
+                        </div>
+
+                        {/* Title AR */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0639\u0646\u0648\u0627\u0646 (\u0639\u0631\u0628\u064a)' : 'Title (AR)'}</label>
+                            <input
+                                className={s.modalInput}
+                                value={newJob.titleAr}
+                                onChange={e => setNewJob(prev => ({ ...prev, titleAr: e.target.value }))}
+                                placeholder={ar ? '\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0645\u0647\u0645\u0629 \u0628\u0627\u0644\u0639\u0631\u0628\u064a...' : 'Arabic title...'}
+                            />
+                        </div>
+
+                        {/* Client */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0639\u0645\u064a\u0644' : 'Client'}</label>
+                            <select
+                                className={s.modalSelect}
+                                value={newJob.clientId}
+                                onChange={e => setNewJob(prev => ({ ...prev, clientId: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u0627\u062e\u062a\u0631 \u0639\u0645\u064a\u0644' : 'Select client'}</option>
+                                {clients.map((c: ClientData) => (
+                                    <option key={c.id} value={c.id}>{ar ? (c.nameAr || c.name) : c.name}</option>
+                                ))}
                             </select>
                         </div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'الحملة (اختياري)' : 'Campaign (optional)'}</label>
-                            <select className={s.modalSelect} value={newJob.campaignId} onChange={e => setNewJob({ ...newJob, campaignId: e.target.value })}>
-                                <option value="">{ar ? 'بدون حملة' : 'No campaign'}</option>
-                                {store.campaigns.map(c => <option key={c.campaignId} value={c.campaignId}>{c.name}</option>)}
+
+                        {/* Campaign */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u062d\u0645\u0644\u0629 (\u0627\u062e\u062a\u064a\u0627\u0631\u064a)' : 'Campaign (optional)'}</label>
+                            <select
+                                className={s.modalSelect}
+                                value={newJob.campaignId}
+                                onChange={e => setNewJob(prev => ({ ...prev, campaignId: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u0628\u062f\u0648\u0646 \u062d\u0645\u0644\u0629' : 'No campaign'}</option>
+                                {campaigns
+                                    .filter((c: CampaignData) => !newJob.clientId || c.clientId === newJob.clientId)
+                                    .map((c: CampaignData) => (
+                                        <option key={c.id} value={c.id}>{ar ? (c.nameAr || c.name) : c.name}</option>
+                                    ))
+                                }
                             </select>
                         </div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'النوع' : 'Category'}</label>
-                            <select className={s.modalSelect} value={newJob.category} onChange={e => setNewJob({ ...newJob, category: e.target.value as any })}>
-                                {Object.entries(catL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+
+                        {/* Job Type */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0646\u0648\u0639' : 'Job Type'}</label>
+                            <select
+                                className={s.modalSelect}
+                                value={newJob.jobType}
+                                onChange={e => setNewJob(prev => ({ ...prev, jobType: e.target.value }))}
+                            >
+                                {Object.entries(JOB_TYPE_LABELS).map(([key, label]) => (
+                                    <option key={key} value={key}>
+                                        {JOB_TYPE_ICONS[key]} {ar ? label.ar : label.en}
+                                    </option>
+                                ))}
                             </select>
                         </div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'المنصة' : 'Platform'}</label><input className={s.modalInput} value={newJob.platform} onChange={e => setNewJob({ ...newJob, platform: e.target.value })} /></div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'الموعد النهائي' : 'Deadline'}</label><input className={s.modalInput} type="date" value={newJob.deadline} onChange={e => setNewJob({ ...newJob, deadline: e.target.value })} /></div>
-                        <div className={s.modalField}><label className={s.modalLabel}>{ar ? 'المسؤول' : 'Owner'}</label>
-                            <select className={s.modalSelect} value={newJob.owner} onChange={e => setNewJob({ ...newJob, owner: e.target.value })}>
-                                {PROD_TEAM.map(m => <option key={m.id} value={m.name}>{m.name} — {m.role}</option>)}
+
+                        {/* Priority */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0623\u0648\u0644\u0648\u064a\u0629' : 'Priority'}</label>
+                            <select
+                                className={s.modalSelect}
+                                value={newJob.priority}
+                                onChange={e => setNewJob(prev => ({ ...prev, priority: e.target.value }))}
+                            >
+                                {Object.entries(PRIORITY_LABELS).map(([key, label]) => (
+                                    <option key={key} value={key}>{ar ? label.ar : label.en}</option>
+                                ))}
                             </select>
                         </div>
+
+                        {/* Assignee */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0645\u0633\u0624\u0648\u0644' : 'Assignee'}</label>
+                            <select
+                                className={s.modalSelect}
+                                value={newJob.assigneeId}
+                                onChange={e => setNewJob(prev => ({ ...prev, assigneeId: e.target.value }))}
+                            >
+                                <option value="">{ar ? '\u063a\u064a\u0631 \u0645\u0639\u064a\u0646' : 'Unassigned'}</option>
+                                {users.map((u: UserData) => (
+                                    <option key={u.id} value={u.id}>
+                                        {ar ? (u.nameAr || u.name) : u.name}
+                                        {u.position ? ` \u2014 ${ar ? (u.positionAr || u.position) : u.position}` : ''}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Shoot Date */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u062a\u0635\u0648\u064a\u0631' : 'Shoot Date'}</label>
+                            <input
+                                className={s.modalInput}
+                                type="date"
+                                value={newJob.shootDate}
+                                onChange={e => setNewJob(prev => ({ ...prev, shootDate: e.target.value }))}
+                            />
+                        </div>
+
+                        {/* Due Date */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0645\u0648\u0639\u062f \u0627\u0644\u0646\u0647\u0627\u0626\u064a' : 'Due Date'}</label>
+                            <input
+                                className={s.modalInput}
+                                type="date"
+                                value={newJob.dueDate}
+                                onChange={e => setNewJob(prev => ({ ...prev, dueDate: e.target.value }))}
+                            />
+                        </div>
+
+                        {/* Location */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0645\u0648\u0642\u0639' : 'Location'}</label>
+                            <input
+                                className={s.modalInput}
+                                value={newJob.location}
+                                onChange={e => setNewJob(prev => ({ ...prev, location: e.target.value }))}
+                                placeholder={ar ? '\u0645\u0648\u0642\u0639 \u0627\u0644\u062a\u0635\u0648\u064a\u0631...' : 'Shoot location...'}
+                            />
+                        </div>
+
+                        {/* Equipment */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0645\u0639\u062f\u0627\u062a (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0648\u0627\u0635\u0644)' : 'Equipment (comma-separated)'}</label>
+                            <input
+                                className={s.modalInput}
+                                value={newJob.equipment}
+                                onChange={e => setNewJob(prev => ({ ...prev, equipment: e.target.value }))}
+                                placeholder={ar ? '\u0643\u0627\u0645\u064a\u0631\u0627, \u0625\u0636\u0627\u0621\u0629, \u0645\u064a\u0643\u0631\u0648\u0641\u0648\u0646...' : 'Camera, Lighting, Mic...'}
+                            />
+                        </div>
+
+                        {/* Deliverables */}
+                        <div className={s.modalField}>
+                            <label className={s.modalLabel}>{ar ? '\u0627\u0644\u0645\u062e\u0631\u062c\u0627\u062a (\u0645\u0641\u0635\u0648\u0644\u0629 \u0628\u0641\u0648\u0627\u0635\u0644)' : 'Deliverables (comma-separated)'}</label>
+                            <input
+                                className={s.modalInput}
+                                value={newJob.deliverables}
+                                onChange={e => setNewJob(prev => ({ ...prev, deliverables: e.target.value }))}
+                                placeholder={ar ? '\u0631\u064a\u0644 30\u062b, \u0635\u0648\u0631 \u0645\u0646\u062a\u062c...' : 'Reel 30s, Product photos...'}
+                            />
+                        </div>
+
+                        {/* Actions */}
                         <div className={s.modalActions}>
-                            <button className={s.btnPrimary} onClick={handleCreateJob} disabled={!newJob.title.trim()}>✅ {ar ? 'إنشاء' : 'Create'}</button>
-                            <button className={s.btnSecondary} onClick={() => setShowNewJob(false)}>{ar ? 'إلغاء' : 'Cancel'}</button>
+                            <button
+                                className={s.btnPrimary}
+                                onClick={handleCreateJob}
+                                disabled={!newJob.title.trim() || creating}
+                            >
+                                {creating
+                                    ? (ar ? '\u062c\u0627\u0631\u064a \u0627\u0644\u0625\u0646\u0634\u0627\u0621...' : 'Creating...')
+                                    : `\u2705 ${ar ? '\u0625\u0646\u0634\u0627\u0621' : 'Create'}`
+                                }
+                            </button>
+                            <button className={s.btnSecondary} onClick={() => { setShowNewJob(false); setNewJob(EMPTY_FORM); }}>
+                                {ar ? '\u0625\u0644\u063a\u0627\u0621' : 'Cancel'}
+                            </button>
                         </div>
                     </div>
                 </div>
             )}
 
-            {/* Monthly Export */}
-            <div style={{ textAlign: 'center', marginTop: 20, paddingBottom: 40 }}>
-                <button className={s.btnPrimary} onClick={() => { const report = store.exportMonthlyReport(lang); const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `production_monthly_report_${report.date}.json`; a.click(); }}>📊 {ar ? 'تصدير تقرير الإنتاج الشهري' : 'Export Monthly Production Report'}</button>
-            </div>
-
+            {/* ── Toast ── */}
             {toast && <div className={s.toast}>{toast}</div>}
         </div>
     );

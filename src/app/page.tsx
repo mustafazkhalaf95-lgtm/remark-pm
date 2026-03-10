@@ -4,7 +4,7 @@ import { useState, useEffect, useTransition, useRef, useCallback, useMemo } from
 import Link from "next/link";
 import { useSettings } from '@/lib/useSettings';
 import { useUsers, useClients } from '@/lib/hooks';
-import { apiMutate } from '@/lib/hooks';
+import { apiMutate, apiUrl } from '@/lib/hooks';
 import { texts } from '@/lib/texts';
 import styles from "./page.module.css";
 
@@ -112,7 +112,7 @@ export default function Home() {
       setConvertedClients(savedClients);
     } else {
       // Fetch from API if no localStorage data
-      fetch('/api/clients?take=50').then(r => r.json()).then(data => {
+      fetch(apiUrl('/api/clients?take=50')).then(r => r.json()).then(data => {
         const dbClients = (data.data || data || []).map((c: any) => ({
           id: c.id,
           name: c.nameAr || c.name,

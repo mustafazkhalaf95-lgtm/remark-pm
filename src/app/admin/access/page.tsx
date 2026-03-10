@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
+import { apiUrl } from '@/lib/hooks';
 
 interface User {
     id: string;
@@ -60,7 +61,7 @@ export default function AccessPage() {
 
     const fetchUsers = async () => {
         try {
-            const res = await fetch('/api/admin/users');
+            const res = await fetch(apiUrl('/api/admin/users'));
             if (!res.ok) throw new Error('فشل في تحميل المستخدمين');
             const data = await res.json();
             setUsers(data);
@@ -77,7 +78,7 @@ export default function AccessPage() {
         if (!newName || !newEmail || !newPassword) return;
         setSubmitting(true);
         try {
-            const res = await fetch('/api/admin/users', {
+            const res = await fetch(apiUrl('/api/admin/users'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: newName, email: newEmail, password: newPassword, role: newRole }),
@@ -98,7 +99,7 @@ export default function AccessPage() {
 
     const handleToggleEnabled = async (user: User) => {
         try {
-            await fetch('/api/admin/users', {
+            await fetch(apiUrl('/api/admin/users'), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: user.id, enabled: !user.enabled }),
@@ -110,14 +111,14 @@ export default function AccessPage() {
     const handleDelete = async (user: User) => {
         if (!confirm(`هل أنت متأكد من حذف ${user.name}؟`)) return;
         try {
-            await fetch(`/api/admin/users?id=${user.id}`, { method: 'DELETE' });
+            await fetch(apiUrl(`/api/admin/users?id=${user.id}`), { method: 'DELETE' });
             fetchUsers();
         } catch { }
     };
 
     const handleRoleChange = async (userId: string, newRole: string) => {
         try {
-            await fetch('/api/admin/users', {
+            await fetch(apiUrl('/api/admin/users'), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: userId, role: newRole }),

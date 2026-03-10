@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 import s from '../settings.module.css';
 
 export default function RolesSettings() {
@@ -13,7 +14,7 @@ export default function RolesSettings() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleteName, setDeleteName] = useState('');
 
-    const load = () => { fetch('/api/settings/roles').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false)); };
+    const load = () => { fetch(apiUrl('/api/settings/roles')).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false)); };
     useEffect(load, []);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -35,7 +36,7 @@ export default function RolesSettings() {
     const savePerms = async () => {
         if (!selectedRole) return;
         try {
-            const res = await fetch('/api/settings/roles', {
+            const res = await fetch(apiUrl('/api/settings/roles'), {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: selectedRole.id, name: selectedRole.name, nameAr: selectedRole.nameAr, description: selectedRole.description, descriptionAr: selectedRole.descriptionAr, scope: selectedRole.scope, permissionIds: Array.from(editPerms) }),
             });
@@ -47,7 +48,7 @@ export default function RolesSettings() {
     const createRole = async () => {
         if (!newRole) return;
         try {
-            const res = await fetch('/api/settings/roles', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRole) });
+            const res = await fetch(apiUrl('/api/settings/roles'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newRole) });
             if (res.ok) { showToast('✅ تم إنشاء الدور'); setShowModal(false); load(); }
             else showToast('❌ خطأ');
         } catch { showToast('❌ خطأ'); }
@@ -56,7 +57,7 @@ export default function RolesSettings() {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            const res = await fetch(`/api/settings/roles?id=${deleteId}`, { method: 'DELETE' });
+            const res = await fetch(apiUrl(`/api/settings/roles?id=${deleteId}`), { method: 'DELETE' });
             if (res.ok) { showToast('✅ تم حذف الدور'); setSelectedRole(null); load(); }
             else { const err = await res.json(); showToast(`❌ ${err.error || 'خطأ'}`); }
         } catch { showToast('❌ خطأ'); }

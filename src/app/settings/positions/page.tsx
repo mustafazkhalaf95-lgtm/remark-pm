@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 import s from '../settings.module.css';
 
 const CATEGORIES: Record<string, string> = {
@@ -23,7 +24,7 @@ export default function PositionsSettings() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleteName, setDeleteName] = useState('');
 
-    const load = () => { fetch('/api/settings/positions').then(r => r.json()).then(d => { setPositions(d); setLoading(false); }).catch(() => setLoading(false)); };
+    const load = () => { fetch(apiUrl('/api/settings/positions')).then(r => r.json()).then(d => { setPositions(d); setLoading(false); }).catch(() => setLoading(false)); };
     useEffect(load, []);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -31,7 +32,7 @@ export default function PositionsSettings() {
     const handleSave = async () => {
         const method = editPos?.id ? 'PUT' : 'POST';
         try {
-            const res = await fetch('/api/settings/positions', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editPos) });
+            const res = await fetch(apiUrl('/api/settings/positions'), { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editPos) });
             if (res.ok) { showToast('✅ تم الحفظ'); setShowModal(false); load(); }
             else showToast('❌ خطأ');
         } catch { showToast('❌ خطأ'); }
@@ -40,7 +41,7 @@ export default function PositionsSettings() {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            const res = await fetch(`/api/settings/positions?id=${deleteId}`, { method: 'DELETE' });
+            const res = await fetch(apiUrl(`/api/settings/positions?id=${deleteId}`), { method: 'DELETE' });
             if (res.ok) { showToast('✅ تم حذف المنصب'); load(); }
             else { const err = await res.json(); showToast(`❌ ${err.error || 'خطأ'}`); }
         } catch { showToast('❌ خطأ'); }

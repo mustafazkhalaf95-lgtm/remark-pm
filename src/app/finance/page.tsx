@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useSettings } from '@/lib/useSettings';
+import { apiUrl } from '@/lib/hooks';
 
 // ─── Translations ───
 const T = {
@@ -355,10 +356,10 @@ export default function FinancePage() {
         setLoading(true);
         try {
             const [invRes, expRes, budRes, cliRes] = await Promise.all([
-                fetch('/api/invoices?take=100').then(r => r.json()),
-                fetch('/api/expenses?take=100').then(r => r.json()),
-                fetch('/api/budgets?take=100').then(r => r.json()),
-                fetch('/api/clients?take=100').then(r => r.json()),
+                fetch(apiUrl('/api/invoices?take=100')).then(r => r.json()),
+                fetch(apiUrl('/api/expenses?take=100')).then(r => r.json()),
+                fetch(apiUrl('/api/budgets?take=100')).then(r => r.json()),
+                fetch(apiUrl('/api/clients?take=100')).then(r => r.json()),
             ]);
             setInvoices(invRes.data || []);
             setExpenses(expRes.data || []);
@@ -421,19 +422,19 @@ export default function FinancePage() {
             items: invForm.items.filter(it => it.description || it.rate),
         };
         if (editingInvoice) {
-            await fetch(`/api/invoices/${editingInvoice.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(apiUrl(`/api/invoices/${editingInvoice.id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         } else {
-            await fetch('/api/invoices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(apiUrl('/api/invoices'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         }
         setShowInvoiceModal(false);
         fetchData();
     };
     const deleteInvoice = async (id: string) => {
-        await fetch(`/api/invoices/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/invoices/${id}`), { method: 'DELETE' });
         fetchData();
     };
     const markInvoiceSent = async (inv: Invoice) => {
-        await fetch(`/api/invoices/${inv.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'sent' }) });
+        await fetch(apiUrl(`/api/invoices/${inv.id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'sent' }) });
         fetchData();
     };
 
@@ -446,7 +447,7 @@ export default function FinancePage() {
     };
     const savePayment = async () => {
         if (!paymentInvoice) return;
-        await fetch(`/api/invoices/${paymentInvoice.id}/payment`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payForm) });
+        await fetch(apiUrl(`/api/invoices/${paymentInvoice.id}/payment`), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payForm) });
         setShowPaymentModal(false);
         fetchData();
     };
@@ -473,15 +474,15 @@ export default function FinancePage() {
     const saveExpense = async () => {
         const payload = { ...expForm, amount: Number(expForm.amount) };
         if (editingExpense) {
-            await fetch(`/api/expenses/${editingExpense.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(apiUrl(`/api/expenses/${editingExpense.id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         } else {
-            await fetch('/api/expenses', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(apiUrl('/api/expenses'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         }
         setShowExpenseModal(false);
         fetchData();
     };
     const deleteExpense = async (id: string) => {
-        await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/expenses/${id}`), { method: 'DELETE' });
         fetchData();
     };
 
@@ -508,15 +509,15 @@ export default function FinancePage() {
     const saveBudget = async () => {
         const payload = { ...budForm, allocated: Number(budForm.allocated) };
         if (editingBudget) {
-            await fetch(`/api/budgets/${editingBudget.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(apiUrl(`/api/budgets/${editingBudget.id}`), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         } else {
-            await fetch('/api/budgets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            await fetch(apiUrl('/api/budgets'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
         }
         setShowBudgetModal(false);
         fetchData();
     };
     const deleteBudget = async (id: string) => {
-        await fetch(`/api/budgets/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/budgets/${id}`), { method: 'DELETE' });
         fetchData();
     };
 

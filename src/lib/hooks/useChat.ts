@@ -5,6 +5,7 @@
    ══════════════════════════════════════════════════════════ */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { apiUrl } from './useFetch';
 
 export interface ChatRoomData {
     id: string;
@@ -58,7 +59,7 @@ export function useChatRooms() {
     const fetchRooms = useCallback(async () => {
         try {
             setLoading(true);
-            const res = await fetch('/api/chat/rooms');
+            const res = await fetch(apiUrl('/api/chat/rooms'));
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
             setRooms(json.items || []);
@@ -83,7 +84,7 @@ export function useChatMessages(roomId: string | null) {
     const fetchMessages = useCallback(async () => {
         if (!roomId) { setMessages([]); setLoading(false); return; }
         try {
-            const res = await fetch(`/api/chat/rooms/${roomId}/messages?take=100`);
+            const res = await fetch(apiUrl(`/api/chat/rooms/${roomId}/messages?take=100`));
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
             setMessages(json.items || []);
@@ -104,7 +105,7 @@ export function useChatMessages(roomId: string | null) {
     const sendMessage = useCallback(async (content: string, senderId: string, type: string = 'text') => {
         if (!roomId) return null;
         try {
-            const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+            const res = await fetch(apiUrl(`/api/chat/rooms/${roomId}/messages`), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content, senderId, type }),

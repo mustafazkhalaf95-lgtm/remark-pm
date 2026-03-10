@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 import s from '../settings.module.css';
 
 // ─── AI Integration Catalog ───
@@ -51,7 +52,7 @@ export default function IntegrationsSettings() {
     const [deleteId, setDeleteId] = useState<string | null>(null);
     const [deleteName, setDeleteName] = useState('');
 
-    const load = () => { fetch('/api/settings/integrations').then(r => r.json()).then(d => { setIntegrations(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false)); };
+    const load = () => { fetch(apiUrl('/api/settings/integrations')).then(r => r.json()).then(d => { setIntegrations(Array.isArray(d) ? d : []); setLoading(false); }).catch(() => setLoading(false)); };
     useEffect(load, []);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
@@ -62,7 +63,7 @@ export default function IntegrationsSettings() {
     // Toggle enable/disable
     const toggleIntegration = async (item: any) => {
         try {
-            await fetch('/api/settings/integrations', {
+            await fetch(apiUrl('/api/settings/integrations'), {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: item.id, isEnabled: !item.isEnabled, config: item.config }),
             });
@@ -80,7 +81,7 @@ export default function IntegrationsSettings() {
             return;
         }
         try {
-            const res = await fetch('/api/settings/integrations', {
+            const res = await fetch(apiUrl('/api/settings/integrations'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: cat.name, nameAr: cat.nameAr, provider: cat.provider, isEnabled: false, config: JSON.stringify({}) }),
             });
@@ -106,7 +107,7 @@ export default function IntegrationsSettings() {
     const saveConfig = async () => {
         if (!selectedInt) return;
         try {
-            await fetch('/api/settings/integrations', {
+            await fetch(apiUrl('/api/settings/integrations'), {
                 method: 'PUT', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: selectedInt.id, isEnabled: selectedInt.isEnabled, config: JSON.stringify(configValues) }),
             });
@@ -157,7 +158,7 @@ export default function IntegrationsSettings() {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            const res = await fetch(`/api/settings/integrations?id=${deleteId}`, { method: 'DELETE' });
+            const res = await fetch(apiUrl(`/api/settings/integrations?id=${deleteId}`), { method: 'DELETE' });
             if (res.ok) { showToast('✅ تم حذف التكامل'); load(); }
             else showToast('❌ خطأ');
         } catch { showToast('❌ خطأ'); }

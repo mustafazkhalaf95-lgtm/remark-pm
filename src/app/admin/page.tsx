@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSession } from 'next-auth/react';
 import AppLayout from '@/components/AppLayout';
+import { apiUrl } from '@/lib/hooks';
 
 interface TableInfo { name: string; count: number }
 interface ColumnInfo { cid: number; name: string; type: string; notnull: number; dflt_value: any; pk: number }
@@ -41,7 +42,7 @@ export default function AdminPage() {
 
     // Load tables on mount
     useEffect(() => {
-        fetch('/api/admin/sql?action=stats')
+        fetch(apiUrl('/api/admin/sql?action=stats'))
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data?.stats) setTables(data.stats); })
             .catch(() => { });
@@ -49,13 +50,13 @@ export default function AdminPage() {
 
     // Get workspace
     useEffect(() => {
-        fetch('/api/workspaces')
+        fetch(apiUrl('/api/workspaces'))
             .then(r => r.ok ? r.json() : [])
             .then(data => {
                 if (Array.isArray(data) && data.length > 0) {
                     setWorkspaceId(data[0].id);
                     // Fetch boards
-                    fetch(`/api/boards?workspaceId=${data[0].id}`)
+                    fetch(apiUrl(`/api/boards?workspaceId=${data[0].id}`))
                         .then(r => r.ok ? r.json() : [])
                         .then(b => setBoards(Array.isArray(b) ? b : []));
                 }
@@ -65,7 +66,7 @@ export default function AdminPage() {
     // Load custom fields when workspace changes
     useEffect(() => {
         if (!workspaceId) return;
-        fetch(`/api/admin/fields?workspaceId=${workspaceId}`)
+        fetch(apiUrl(`/api/admin/fields?workspaceId=${workspaceId}`))
             .then(r => r.ok ? r.json() : [])
             .then(data => setCustomFields(Array.isArray(data) ? data : []))
             .catch(() => { });
@@ -78,7 +79,7 @@ export default function AdminPage() {
         setSqlResult(null);
 
         try {
-            const res = await fetch('/api/admin/sql', {
+            const res = await fetch(apiUrl('/api/admin/sql'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: sqlQuery }),
@@ -99,8 +100,8 @@ export default function AdminPage() {
     const loadTableSchema = async (tableName: string) => {
         setSelectedTable(tableName);
         const [schemaRes, dataRes] = await Promise.all([
-            fetch(`/api/admin/sql?action=schema&table=${tableName}`),
-            fetch('/api/admin/sql', {
+            fetch(apiUrl(`/api/admin/sql?action=schema&table=${tableName}`)),
+            fetch(apiUrl('/api/admin/sql'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ query: `SELECT * FROM "${tableName}" LIMIT 50`, type: 'query' }),
@@ -126,7 +127,7 @@ export default function AdminPage() {
         if (newField.fieldType === 'LIST' && newField.options) {
             body.options = newField.options.split(',').map(o => o.trim()).filter(Boolean);
         }
-        await fetch('/api/admin/fields', {
+        await fetch(apiUrl('/api/admin/fields'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
@@ -134,13 +135,13 @@ export default function AdminPage() {
         setShowNewField(false);
         setNewField({ name: '', displayName: '', fieldType: 'TEXT', options: '', boardIds: [] });
         // Reload
-        const res = await fetch(`/api/admin/fields?workspaceId=${workspaceId}`);
+        const res = await fetch(apiUrl(`/api/admin/fields?workspaceId=${workspaceId}`));
         setCustomFields(await res.json());
     };
 
     const deleteField = async (fieldId: string) => {
         if (!confirm('هل أنت متأكد من حذف هذا الحقل؟')) return;
-        await fetch(`/api/admin/fields?fieldId=${fieldId}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/admin/fields?fieldId=${fieldId}`), { method: 'DELETE' });
         setCustomFields(prev => prev.filter(f => f.id !== fieldId));
     };
 

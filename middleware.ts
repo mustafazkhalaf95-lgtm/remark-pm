@@ -56,7 +56,8 @@ export async function middleware(request: NextRequest) {
                 { status: 401 }
             );
         }
-        const loginUrl = new URL('/login', request.url);
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = '/login';
         loginUrl.searchParams.set('callbackUrl', pathname);
         return NextResponse.redirect(loginUrl);
     }

@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AppLayout from '@/components/AppLayout';
+import { apiUrl } from '@/lib/hooks';
 
 /* ═══════════════════════════════════════════════════════════
    Remark PM — Project Timeline / Gantt Chart
@@ -267,7 +268,7 @@ export default function TimelinePage() {
             const params = new URLSearchParams();
             if (filterClient) params.set('clientId', filterClient);
             if (filterBoard) params.set('board', filterBoard);
-            const res = await fetch(`/api/timeline?${params}`);
+            const res = await fetch(apiUrl(`/api/timeline?${params}`));
             const json = await res.json();
             setTasks(json.tasks || []);
             setMilestones(json.milestones || []);
@@ -401,7 +402,7 @@ export default function TimelinePage() {
         if (!milestoneForm.title || !milestoneForm.dueDate) return;
         try {
             if (editingMilestone) {
-                const res = await fetch(`/api/milestones/${editingMilestone.id}`, {
+                const res = await fetch(apiUrl(`/api/milestones/${editingMilestone.id}`), {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(milestoneForm),
@@ -411,7 +412,7 @@ export default function TimelinePage() {
                     setMilestones(milestones.map((m) => m.id === updated.id ? updated : m));
                 }
             } else {
-                const res = await fetch('/api/milestones', {
+                const res = await fetch(apiUrl('/api/milestones'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(milestoneForm),
@@ -429,7 +430,7 @@ export default function TimelinePage() {
 
     const handleDeleteMilestone = async (id: string) => {
         if (!confirm('حذف هذا المعلم؟ / Delete this milestone?')) return;
-        await fetch(`/api/milestones/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/milestones/${id}`), { method: 'DELETE' });
         setMilestones(milestones.filter((m) => m.id !== id));
     };
 

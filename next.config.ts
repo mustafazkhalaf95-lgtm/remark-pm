@@ -1,11 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  basePath: '/work/workflow',
   typescript: {
     ignoreBuildErrors: false,
   },
-  turbopack: {
-    root: '/Users/mustafakhalaf/remark-pm/.claude/worktrees/serene-benz',
+  output: 'standalone',
+  env: {
+    NEXT_PUBLIC_BASE_PATH: '/work/workflow',
   },
 };
 

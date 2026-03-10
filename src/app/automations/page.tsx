@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import AppLayout from '@/components/AppLayout';
+import { apiUrl } from '@/lib/hooks';
 
 interface AutomationRule {
     id: string;
@@ -27,14 +28,14 @@ export default function AutomationsPage() {
     const [newRule, setNewRule] = useState({ name: '', description: '', trigger: 'FIELD_CHANGE', triggerConfig: '{}', actions: '[]' });
 
     useEffect(() => {
-        fetch('/api/automations').then(r => r.json()).then(data => {
+        fetch(apiUrl('/api/automations')).then(r => r.json()).then(data => {
             setRules(Array.isArray(data) ? data : []);
             setLoading(false);
         });
     }, []);
 
     const toggleRule = async (id: string, enabled: boolean) => {
-        await fetch(`/api/automations/${id}`, {
+        await fetch(apiUrl(`/api/automations/${id}`), {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ enabled }),
@@ -44,16 +45,16 @@ export default function AutomationsPage() {
 
     const deleteRule = async (id: string) => {
         if (!confirm('هل تريد حذف هذه القاعدة؟')) return;
-        await fetch(`/api/automations/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/automations/${id}`), { method: 'DELETE' });
         setRules(rules.filter(r => r.id !== id));
     };
 
     const seedRules = async () => {
         setSeeding(true);
-        const res = await fetch('/api/automations/seed', { method: 'POST' });
+        const res = await fetch(apiUrl('/api/automations/seed'), { method: 'POST' });
         if (res.ok) {
             const data = await res.json();
-            const rulesRes = await fetch('/api/automations');
+            const rulesRes = await fetch(apiUrl('/api/automations'));
             setRules(await rulesRes.json());
         }
         setSeeding(false);
@@ -62,7 +63,7 @@ export default function AutomationsPage() {
     const createRule = async () => {
         if (!newRule.name) return;
         try {
-            const res = await fetch('/api/automations', {
+            const res = await fetch(apiUrl('/api/automations'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

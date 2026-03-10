@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/lib/hooks';
 
 const TABS = [
     { id: 'overview', label: 'نظرة عامة', labelEn: 'Overview', icon: '📊' },
@@ -40,7 +41,7 @@ export default function HRPage() {
         setLoading(true);
         try {
             const [lRes, rRes, uRes] = await Promise.all([
-                fetch('/api/hr/leaves'), fetch('/api/hr/reviews'), fetch('/api/settings/users'),
+                fetch(apiUrl('/api/hr/leaves')), fetch(apiUrl('/api/hr/reviews')), fetch(apiUrl('/api/settings/users')),
             ]);
             if (lRes.ok) setLeaves(await lRes.json().then(d => d.items || d));
             if (rRes.ok) setReviews(await rRes.json().then(d => d.items || d));
@@ -52,7 +53,7 @@ export default function HRPage() {
     useEffect(() => { fetchData(); }, [fetchData]);
 
     const submitLeave = async () => {
-        const res = await fetch('/api/hr/leaves', {
+        const res = await fetch(apiUrl('/api/hr/leaves'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(leaveForm),
         });
@@ -60,7 +61,7 @@ export default function HRPage() {
     };
 
     const submitReview = async () => {
-        const res = await fetch('/api/hr/reviews', {
+        const res = await fetch(apiUrl('/api/hr/reviews'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(reviewForm),
         });
@@ -68,7 +69,7 @@ export default function HRPage() {
     };
 
     const approveLeave = async (id: string, decision: string) => {
-        await fetch(`/api/hr/leaves/${id}`, {
+        await fetch(apiUrl(`/api/hr/leaves/${id}`), {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ status: decision }),
         });

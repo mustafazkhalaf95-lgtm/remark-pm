@@ -7,6 +7,15 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+/** Prepend basePath to API URLs for production deployment */
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
+
+export function apiUrl(path: string): string {
+    // Don't double-prefix if already prefixed, and skip external URLs
+    if (path.startsWith('http') || path.startsWith(BASE_PATH)) return path;
+    return `${BASE_PATH}${path}`;
+}
+
 export interface UseFetchResult<T> {
     data: T | null;
     error: string | null;
@@ -29,7 +38,7 @@ export function useFetch<T>(url: string | null, options?: RequestInit): UseFetch
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(url, { ...options, signal: ctrl.signal });
+            const res = await fetch(apiUrl(url), { ...options, signal: ctrl.signal });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
                 throw new Error(body.error || body.error_en || `HTTP ${res.status}`);
@@ -64,7 +73,7 @@ export async function apiMutate<T = any>(
     body?: any
 ): Promise<{ data: T | null; error: string | null }> {
     try {
-        const res = await fetch(url, {
+        const res = await fetch(apiUrl(url), {
             method,
             headers: { 'Content-Type': 'application/json' },
             body: body ? JSON.stringify(body) : undefined,

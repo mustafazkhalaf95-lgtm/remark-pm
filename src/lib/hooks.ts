@@ -6,7 +6,7 @@
 'use client';
 
 // Core
-export { useFetch, apiMutate } from './hooks/useFetch';
+export { useFetch, apiMutate, apiUrl } from './hooks/useFetch';
 
 // Data hooks
 export { useClients } from './hooks/useClients';

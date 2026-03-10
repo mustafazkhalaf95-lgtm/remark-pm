@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/lib/hooks';
 
 const bg = 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)';
 const glass = { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px' };
@@ -46,7 +47,7 @@ export default function CalendarPage() {
         const start = new Date(year, month, 1).toISOString();
         const end = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
         try {
-            const res = await fetch(`/api/calendar?startDate=${start}&endDate=${end}`);
+            const res = await fetch(apiUrl(`/api/calendar?startDate=${start}&endDate=${end}`));
             if (res.ok) {
                 const data = await res.json();
                 setEvents(data.items || []);
@@ -64,7 +65,7 @@ export default function CalendarPage() {
             ? new Date((form.endDate || form.startDate) + 'T23:59:59')
             : new Date((form.endDate || form.startDate) + 'T' + form.endTime);
 
-        await fetch('/api/calendar', {
+        await fetch(apiUrl('/api/calendar'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -85,7 +86,7 @@ export default function CalendarPage() {
     };
 
     const deleteEvent = async (id: string) => {
-        await fetch(`/api/calendar/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/calendar/${id}`), { method: 'DELETE' });
         setShowEventModal(null);
         fetchEvents();
     };

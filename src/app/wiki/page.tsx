@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/lib/hooks';
 
 const CATEGORIES = [
     { value: 'all', label: 'الكل', icon: '📚' },
@@ -29,7 +30,7 @@ export default function WikiPage() {
             const params = new URLSearchParams();
             if (category !== 'all') params.set('category', category);
             if (search) params.set('search', search);
-            const res = await fetch(`/api/wiki?${params}`);
+            const res = await fetch(apiUrl(`/api/wiki?${params}`));
             if (res.ok) {
                 const data = await res.json();
                 setArticles(data.items || []);
@@ -42,7 +43,7 @@ export default function WikiPage() {
 
     const saveArticle = async () => {
         const method = selectedArticle?.id ? 'PUT' : 'POST';
-        const url = selectedArticle?.id ? `/api/wiki/${selectedArticle.id}` : '/api/wiki';
+        const url = selectedArticle?.id ? apiUrl(`/api/wiki/${selectedArticle.id}`) : apiUrl('/api/wiki');
         const res = await fetch(url, {
             method, headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
 // Remark PM — Prisma Schema
-// SQLite-backed persistence for the entire platform
+// PostgreSQL-backed persistence for production
 // ═══════════════════════════════════════════════════════════════
 
 generator client {
@@ -8,7 +8,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 

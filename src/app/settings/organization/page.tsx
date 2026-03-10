@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 import s from '../settings.module.css';
 
 export default function OrganizationSettings() {
@@ -9,7 +10,7 @@ export default function OrganizationSettings() {
     const [toast, setToast] = useState('');
 
     useEffect(() => {
-        fetch('/api/settings/organization').then(r => r.json()).then(d => { setOrg(d); setLoading(false); }).catch(() => setLoading(false));
+        fetch(apiUrl('/api/settings/organization')).then(r => r.json()).then(d => { setOrg(d); setLoading(false); }).catch(() => setLoading(false));
     }, []);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -17,7 +18,7 @@ export default function OrganizationSettings() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const res = await fetch('/api/settings/organization', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(org) });
+            const res = await fetch(apiUrl('/api/settings/organization'), { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(org) });
             if (res.ok) showToast('✅ تم الحفظ بنجاح');
             else showToast('❌ خطأ في الحفظ');
         } catch { showToast('❌ خطأ في الاتصال'); }

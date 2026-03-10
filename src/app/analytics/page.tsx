@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { apiUrl } from '@/lib/hooks';
 
 /* ══════════════════════════════════════════════════════════
    Remark PM — Analytics Dashboard
@@ -156,7 +157,7 @@ export default function AnalyticsPage() {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/analytics?period=${period}`);
+            const res = await fetch(apiUrl(`/api/analytics?period=${period}`));
             const json = await res.json();
             setData(json);
         } catch (e) {

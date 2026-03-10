@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import AppLayout from '@/components/AppLayout';
+import { apiUrl } from '@/lib/hooks';
 
 /* ═══════════════════════════════════════════════════════════
    Remark PM — File Library
@@ -250,7 +251,7 @@ export default function FilesPage() {
             if (activeFolder !== 'all') params.set('folder', activeFolder);
             if (search) params.set('search', search);
             params.set('take', '100');
-            const res = await fetch(`/api/files?${params}`);
+            const res = await fetch(apiUrl(`/api/files?${params}`));
             const json = await res.json();
             setFiles(json.data || []);
         } catch { setFiles([]); }
@@ -273,7 +274,7 @@ export default function FilesPage() {
         }, 200);
 
         try {
-            const res = await fetch('/api/files', {
+            const res = await fetch(apiUrl('/api/files'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(uploadForm),
@@ -299,7 +300,7 @@ export default function FilesPage() {
     // ─── Delete Handler ───
     const handleDelete = async (id: string) => {
         if (!confirm('هل تريد حذف هذا الملف؟ / Delete this file?')) return;
-        await fetch(`/api/files/${id}`, { method: 'DELETE' });
+        await fetch(apiUrl(`/api/files/${id}`), { method: 'DELETE' });
         setFiles(files.filter((f) => f.id !== id));
         if (selectedFile?.id === id) setSelectedFile(null);
     };

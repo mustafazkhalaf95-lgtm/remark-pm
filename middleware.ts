@@ -35,28 +35,18 @@ export async function middleware(request: NextRequest) {
     const token = await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
+        cookieName: 'next-auth.session-token',
     });
 
     if (!token) {
-        // In development: allow page access (API routes still need auth in production)
-        // In production: redirect to login
-        if (process.env.NODE_ENV !== 'production') {
-            // Allow all pages in dev, but API routes still require auth
-            // except settings/overview which needs to load data
-            if (pathname.startsWith('/api/') && !pathname.startsWith('/api/settings') && !pathname.startsWith('/api/auth')) {
-                // Let individual route handlers check auth
-                return NextResponse.next();
-            }
-            return NextResponse.next();
-        }
-
         if (pathname.startsWith('/api/')) {
             return NextResponse.json(
                 { error: 'Unauthorized', error_ar: 'غير مصرح' },
                 { status: 401 }
             );
         }
-        const loginUrl = new URL('/login', request.url);
+        const loginUrl = request.nextUrl.clone();
+        loginUrl.pathname = '/login';
         loginUrl.searchParams.set('callbackUrl', pathname);
         return NextResponse.redirect(loginUrl);
     }

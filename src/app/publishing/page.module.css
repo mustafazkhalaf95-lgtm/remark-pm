@@ -1066,4 +1066,309 @@
         flex-direction: column;
         text-align: center;
     }
+
+    .boardName {
+        font-size: 14px;
+    }
+
+    .kpiValue {
+        font-size: 22px;
+    }
+
+    .calDay {
+        min-height: 60px;
+        padding: 3px;
+    }
+
+    .calDayNum {
+        font-size: 10px;
+    }
+
+    .teamGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .teamCard {
+        padding: 10px;
+    }
+
+    .activityItem {
+        padding: 8px 10px;
+        font-size: 12px;
+    }
+
+    .alertCard {
+        padding: 10px 12px;
+        font-size: 12px;
+    }
+
+    .modal {
+        padding: 20px;
+    }
+
+    .modalTitle {
+        font-size: 16px;
+    }
+
+    .navSwitcher {
+        flex-wrap: wrap;
+        border-radius: 14px;
+    }
+
+    .navActive,
+    .navInactive {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+
+    .sectionTitle {
+        font-size: 13px;
+    }
+
+    .clientCard {
+        padding: 14px;
+    }
+
+    .clientCardName {
+        font-size: 15px;
+    }
+
+    .clientStatVal {
+        font-size: 18px;
+    }
+
+    .todayCard {
+        padding: 12px;
+    }
+
+    .todayCardTitle {
+        font-size: 13px;
+    }
+
+    .perfGrid {
+        grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .headerLeft {
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 6px;
+    }
+
+    .content {
+        padding: 10px;
+    }
+
+    .boardName {
+        font-size: 13px;
+    }
+
+    .logoText {
+        font-size: 15px;
+    }
+
+    .logoIcon {
+        width: 28px;
+        height: 28px;
+        font-size: 13px;
+    }
+
+    .kpiGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .kpiCard {
+        padding: 12px;
+    }
+
+    .kpiValue {
+        font-size: 20px;
+    }
+
+    .kpiLabel {
+        font-size: 10px;
+    }
+
+    .pipelineCols {
+        gap: 6px;
+    }
+
+    .pipelineCol {
+        min-width: 150px;
+        padding: 8px;
+    }
+
+    .pipelineJobCard {
+        padding: 8px;
+    }
+
+    .pipelineJobTitle {
+        font-size: 12px;
+    }
+
+    .calDay {
+        min-height: 44px;
+        padding: 2px;
+    }
+
+    .calDayNum {
+        font-size: 9px;
+    }
+
+    .calEvent {
+        font-size: 8px;
+        padding: 1px 3px;
+    }
+
+    .teamCard {
+        padding: 8px;
+        gap: 8px;
+    }
+
+    .teamAvatar {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+    }
+
+    .teamName {
+        font-size: 12px;
+    }
+
+    .activityItem {
+        padding: 6px 8px;
+        font-size: 11px;
+        gap: 6px;
+    }
+
+    .activityIcon {
+        font-size: 14px;
+    }
+
+    .alertCard {
+        padding: 8px 10px;
+        font-size: 11px;
+    }
+
+    .clientCard {
+        padding: 12px;
+    }
+
+    .clientCardAvatar {
+        width: 40px;
+        height: 40px;
+        font-size: 28px;
+    }
+
+    .clientCardName {
+        font-size: 14px;
+    }
+
+    .clientStatVal {
+        font-size: 16px;
+    }
+
+    .clientStatLbl {
+        font-size: 9px;
+    }
+
+    .todayGrid {
+        gap: 8px;
+    }
+
+    .todayCard {
+        padding: 10px;
+    }
+
+    .todayCardTitle {
+        font-size: 12px;
+    }
+
+    .todayCardCaption {
+        font-size: 11px;
+        padding: 6px 8px;
+    }
+
+    .perfGrid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .perfCard {
+        padding: 8px;
+    }
+
+    .perfValue {
+        font-size: 16px;
+    }
+
+    .perfLabel {
+        font-size: 9px;
+    }
+
+    .campBadge {
+        font-size: 10px;
+        padding: 2px 8px;
+    }
+
+    .modal {
+        padding: 16px;
+    }
+
+    .modalTitle {
+        font-size: 15px;
+    }
+
+    .btnPrimary,
+    .btnSecondary {
+        padding: 8px 16px;
+        font-size: 12px;
+    }
+
+    .actionBtn {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+
+    .sectionTitle {
+        font-size: 12px;
+    }
+
+    .iconBtn {
+        width: 30px;
+        height: 30px;
+    }
+
+    .userAvatar {
+        width: 28px;
+        height: 28px;
+        font-size: 10px;
+    }
+
+    .boardDot {
+        display: none;
+    }
+
+    .headerDivider {
+        display: none;
+    }
+
+    .clientDrillHeader {
+        padding: 12px;
+    }
+
+    .clientDrillName {
+        font-size: 16px;
+    }
+
+    .backBtn {
+        padding: 6px 12px;
+        font-size: 12px;
+    }
 }

@@ -116,6 +116,34 @@ export const authOptions = {
     pages: { signIn: '/login' },
     session: { strategy: 'jwt' as const, maxAge: 24 * 60 * 60 }, // 24 hours
     secret: process.env.NEXTAUTH_SECRET,
+    cookies: {
+        sessionToken: {
+            name: 'next-auth.session-token',
+            options: {
+                httpOnly: true,
+                sameSite: 'lax' as const,
+                path: process.env.NEXT_PUBLIC_BASE_PATH || '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
+        },
+        callbackUrl: {
+            name: 'next-auth.callback-url',
+            options: {
+                sameSite: 'lax' as const,
+                path: process.env.NEXT_PUBLIC_BASE_PATH || '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
+        },
+        csrfToken: {
+            name: 'next-auth.csrf-token',
+            options: {
+                httpOnly: true,
+                sameSite: 'lax' as const,
+                path: process.env.NEXT_PUBLIC_BASE_PATH || '/',
+                secure: process.env.NODE_ENV === 'production',
+            },
+        },
+    },
 };
 
 const handler = NextAuth(authOptions);

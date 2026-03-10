@@ -213,3 +213,26 @@ textarea {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL RESPONSIVE — for pages using inline styles
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  body {
+    font-size: 14px;
+  }
+  /* Prevent horizontal overflow */
+  main, [role="main"] {
+    overflow-x: hidden;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 13px;
+  }
+  :root {
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+  }
+}

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 import s from '../settings.module.css';
 
 export default function SecuritySettings() {
@@ -13,7 +14,7 @@ export default function SecuritySettings() {
         setLoading(true);
         const params = new URLSearchParams({ page: String(p), limit: '20' });
         if (cat) params.set('category', cat);
-        fetch(`/api/settings/audit?${params}`).then(r => r.json()).then(d => {
+        fetch(apiUrl(`/api/settings/audit?${params}`)).then(r => r.json()).then(d => {
             setLogs(d.logs || []);
             setTotal(d.total || 0);
             setPage(p);

@@ -1,4 +1,4 @@
-export { useFetch, apiMutate } from './useFetch';
+export { useFetch, apiMutate, apiUrl } from './useFetch';
 export { useClients } from './useClients';
 export type { ClientData } from './useClients';
 export { useMarketingTasks } from './useMarketingTasks';

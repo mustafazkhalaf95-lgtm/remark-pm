@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { apiUrl } from '@/lib/hooks';
 import s from './settings.module.css';
 
 export default function SettingsOverview() {
@@ -8,7 +9,7 @@ export default function SettingsOverview() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetch('/api/settings').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+        fetch(apiUrl('/api/settings')).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
     }, []);
 
     if (loading) return <div className={s.loading}><div className={s.spinner} /><br />جاري التحميل...</div>;

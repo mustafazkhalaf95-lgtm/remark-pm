@@ -1087,4 +1087,221 @@
     .bottom3 {
         grid-template-columns: 1fr;
     }
+
+    .boardName {
+        font-size: 18px;
+    }
+
+    .kpiValue {
+        font-size: 24px;
+    }
+
+    .calGrid {
+        grid-template-columns: repeat(7, 1fr);
+        gap: 1px;
+    }
+
+    .calDay {
+        min-height: 54px;
+        padding: 3px;
+    }
+
+    .calDayNum {
+        font-size: 10px;
+    }
+
+    .calMonth {
+        font-size: 15px;
+    }
+
+    .calLegend {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .assetSearch {
+        width: 100%;
+    }
+
+    .assetGrid {
+        grid-template-columns: 1fr;
+    }
+
+    .showcaseWrap {
+        height: 160px;
+    }
+
+    .showcaseTile {
+        width: 240px;
+    }
+
+    .showcaseScreen {
+        width: 90px;
+    }
+
+    .filterBar {
+        gap: 6px;
+    }
+
+    .filterSel {
+        min-width: 100px;
+        font-size: 11px;
+    }
+
+    .switcher {
+        flex-wrap: wrap;
+        border-radius: 14px;
+    }
+
+    .swBtn {
+        font-size: 11px;
+        padding: 5px 10px;
+    }
+
+    .bigCal {
+        padding: 12px;
+    }
+
+    .panel {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .header {
+        padding: 10px 10px;
+    }
+
+    .content {
+        padding: 0 10px 14px;
+    }
+
+    .boardName {
+        font-size: 16px;
+    }
+
+    .logoText {
+        font-size: 16px;
+    }
+
+    .logoIcon {
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
+    }
+
+    .kpiRow {
+        grid-template-columns: 1fr;
+    }
+
+    .kpiCard {
+        padding: 12px 14px;
+    }
+
+    .kpiValue {
+        font-size: 22px;
+    }
+
+    .kpiLabel {
+        font-size: 10px;
+    }
+
+    .clientCard {
+        padding: 14px;
+    }
+
+    .clientName {
+        font-size: 15px;
+    }
+
+    .clientMetrics {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+
+    .metricVal {
+        font-size: 16px;
+    }
+
+    .calGrid {
+        gap: 0;
+    }
+
+    .calDay {
+        min-height: 44px;
+        padding: 2px;
+    }
+
+    .calDayNum {
+        font-size: 9px;
+    }
+
+    .calEv {
+        width: 18px;
+        height: 18px;
+        font-size: 8px;
+    }
+
+    .calMonth {
+        font-size: 14px;
+    }
+
+    .showcaseWrap {
+        height: 140px;
+    }
+
+    .showcaseTile {
+        width: 200px;
+    }
+
+    .showcaseScreen {
+        width: 70px;
+    }
+
+    .showcaseTitle {
+        font-size: 12px;
+    }
+
+    .showcaseMeta {
+        font-size: 9px;
+    }
+
+    .bigCal {
+        padding: 8px;
+    }
+
+    .panel {
+        padding: 10px;
+        max-height: 280px;
+    }
+
+    .panelTitle {
+        font-size: 12px;
+    }
+
+    .secTitle {
+        font-size: 12px;
+    }
+
+    .assetSearch {
+        width: 100%;
+        font-size: 11px;
+    }
+
+    .pipeCol {
+        width: 160px;
+    }
+
+    .pipeCardTitle {
+        font-size: 11px;
+    }
+
+    .dot {
+        display: none;
+    }
+
+    .iconBtn {
+        width: 32px;
+        height: 32px;
+    }
 }

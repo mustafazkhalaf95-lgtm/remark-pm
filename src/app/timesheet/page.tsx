@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
+import { apiUrl } from '@/lib/hooks';
 
 /* ══════════════════════════════════════════════════════════
    Remark PM — Time Tracking / Timesheet
@@ -183,7 +184,7 @@ export default function TimesheetPage() {
             if (filterDateFrom) params.set('startDate', filterDateFrom);
             if (filterDateTo) params.set('endDate', filterDateTo);
 
-            const res = await fetch(`/api/time-entries?${params}`);
+            const res = await fetch(apiUrl(`/api/time-entries?${params}`));
             const json = await res.json();
             setEntries(json.data || []);
         } catch (e) {
@@ -195,7 +196,7 @@ export default function TimesheetPage() {
         try {
             const params = new URLSearchParams({ period });
             if (filterClient) params.set('clientId', filterClient);
-            const res = await fetch(`/api/time-entries/summary?${params}`);
+            const res = await fetch(apiUrl(`/api/time-entries/summary?${params}`));
             const json = await res.json();
             setSummary(json);
         } catch (e) {
@@ -205,7 +206,7 @@ export default function TimesheetPage() {
 
     const fetchClients = useCallback(async () => {
         try {
-            const res = await fetch('/api/clients?take=100&status=active');
+            const res = await fetch(apiUrl('/api/clients?take=100&status=active'));
             const json = await res.json();
             setClients(json.data || []);
         } catch (e) {
@@ -252,7 +253,7 @@ export default function TimesheetPage() {
 
     const startTimer = async () => {
         try {
-            const res = await fetch('/api/time-entries', {
+            const res = await fetch(apiUrl('/api/time-entries'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -276,7 +277,7 @@ export default function TimesheetPage() {
     const stopTimer = async () => {
         if (!activeEntryId) return;
         try {
-            await fetch(`/api/time-entries/${activeEntryId}`, {
+            await fetch(apiUrl(`/api/time-entries/${activeEntryId}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -307,7 +308,7 @@ export default function TimesheetPage() {
 
     const deleteEntry = async (id: string) => {
         try {
-            await fetch(`/api/time-entries/${id}`, { method: 'DELETE' });
+            await fetch(apiUrl(`/api/time-entries/${id}`), { method: 'DELETE' });
             fetchEntries();
             fetchSummary(tab === 'monthly' ? 'month' : 'week');
         } catch (e) {
@@ -326,7 +327,7 @@ export default function TimesheetPage() {
     const saveEdit = async () => {
         if (!editEntry) return;
         try {
-            await fetch(`/api/time-entries/${editEntry.id}`, {
+            await fetch(apiUrl(`/api/time-entries/${editEntry.id}`), {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

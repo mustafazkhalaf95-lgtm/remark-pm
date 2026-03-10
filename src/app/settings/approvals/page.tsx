@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 import s from '../settings.module.css';
 
 const WORKFLOWS: Record<string, string> = {
@@ -30,7 +31,7 @@ export default function ApprovalsSettings() {
     const [deleteType, setDeleteType] = useState<'policy' | 'authority'>('policy');
     const [deleteName, setDeleteName] = useState('');
 
-    const load = () => { fetch('/api/settings/approvals').then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false)); };
+    const load = () => { fetch(apiUrl('/api/settings/approvals')).then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false)); };
     useEffect(load, []);
 
     const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 2500); };
@@ -39,7 +40,7 @@ export default function ApprovalsSettings() {
         try {
             const body = tab === 'policies' ? { ...editItem, type: 'policy' } : { ...editItem, type: 'authority' };
             const method = editItem?.id ? 'PUT' : 'POST';
-            const res = await fetch('/api/settings/approvals', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            const res = await fetch(apiUrl('/api/settings/approvals'), { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
             if (res.ok) { showToast('✅ تم الحفظ'); setShowModal(false); load(); }
             else showToast('❌ خطأ');
         } catch { showToast('❌ خطأ'); }
@@ -48,7 +49,7 @@ export default function ApprovalsSettings() {
     const handleDelete = async () => {
         if (!deleteId) return;
         try {
-            const res = await fetch(`/api/settings/approvals?id=${deleteId}&type=${deleteType}`, { method: 'DELETE' });
+            const res = await fetch(apiUrl(`/api/settings/approvals?id=${deleteId}&type=${deleteType}`), { method: 'DELETE' });
             if (res.ok) { showToast('✅ تم الحذف'); load(); }
             else showToast('❌ خطأ');
         } catch { showToast('❌ خطأ'); }

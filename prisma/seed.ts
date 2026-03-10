@@ -208,6 +208,7 @@ async function main() {
         { email: 'musa@remark.iq', fullName: 'موسى', fullNameAr: 'موسى', displayName: 'Musa', displayNameAr: 'موسى', position: 'Videographer', role: 'staff', department: 'production', avatar: 'م', employeeCode: 'RMK-010' },
         { email: 'social@remark.iq', fullName: 'أخصائي سوشيال', fullNameAr: 'أخصائي سوشيال', displayName: 'Social Specialist', displayNameAr: 'أخصائي سوشيال', position: 'Social Media Manager', role: 'staff', department: 'marketing', avatar: 'ش', employeeCode: 'RMK-011' },
         { email: 'ibrahim@remark.iq', fullName: 'إبراهيم', fullNameAr: 'إبراهيم', displayName: 'Ibrahim', displayNameAr: 'إبراهيم', position: 'Publisher', role: 'staff', department: 'publishing', avatar: 'إ', employeeCode: 'RMK-012' },
+        { email: 'info@remark-agency.com', fullName: 'مدير النظام', fullNameAr: 'مدير النظام', displayName: 'System Admin', displayNameAr: 'مدير النظام', position: 'Chief Executive Officer', role: 'ceo', department: 'operations', avatar: 'RM', employeeCode: 'RMK-100' },
     ];
 
     const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 12);

@@ -47,8 +47,17 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         if (body.receiptUrl !== undefined) updateData.receiptUrl = body.receiptUrl;
         if (body.clientId !== undefined) updateData.clientId = body.clientId || null;
         if (body.campaignId !== undefined) updateData.campaignId = body.campaignId || null;
+        if (body.taskType !== undefined) updateData.taskType = body.taskType || null;
+        if (body.taskId !== undefined) updateData.taskId = body.taskId || null;
         if (body.status !== undefined) updateData.status = body.status;
-        if (body.status === 'approved') updateData.approvedBy = auth.session.user.id;
+        if (body.status === 'approved') {
+            updateData.approvedBy = auth.session.user.id;
+            updateData.approvedAt = new Date();
+        }
+        if (body.status === 'rejected') {
+            updateData.approvedBy = auth.session.user.id;
+            updateData.approvedAt = new Date();
+        }
 
         const expense = await prisma.expense.update({
             where: { id },

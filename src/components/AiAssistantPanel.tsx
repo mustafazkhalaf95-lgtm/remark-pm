@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { apiUrl } from '@/lib/hooks';
 
 interface Message {
     id: string;
@@ -27,7 +28,7 @@ export default function AiAssistantPanel() {
         setLoading(true);
 
         try {
-            const res = await fetch('/api/ai/chat', {
+            const res = await fetch(apiUrl('/api/ai/chat'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMsg, conversationId }),

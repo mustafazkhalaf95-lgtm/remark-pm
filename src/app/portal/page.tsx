@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { apiUrl } from '@/lib/hooks';
 
 const bg = 'linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%)';
 const glass = { background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px' };
@@ -45,7 +46,7 @@ export default function PortalPage() {
 
     const fetchClients = useCallback(async () => {
         try {
-            const res = await fetch('/api/clients?status=active');
+            const res = await fetch(apiUrl('/api/clients?status=active'));
             if (res.ok) {
                 const data = await res.json();
                 setClients(data.items || []);
@@ -59,12 +60,12 @@ export default function PortalPage() {
         setLoading(true);
         try {
             const [crRes, pjRes, piRes, fbRes, paRes, invRes] = await Promise.all([
-                fetch(`/api/creative-requests?clientId=${selectedClient}`),
-                fetch(`/api/production-jobs?clientId=${selectedClient}`),
-                fetch(`/api/publishing-items?clientId=${selectedClient}`),
-                fetch(`/api/portal/feedback?clientId=${selectedClient}`),
-                fetch(`/api/portal/auth?clientId=${selectedClient}`),
-                fetch(`/api/invoices?clientId=${selectedClient}`),
+                fetch(apiUrl(`/api/creative-requests?clientId=${selectedClient}`)),
+                fetch(apiUrl(`/api/production-jobs?clientId=${selectedClient}`)),
+                fetch(apiUrl(`/api/publishing-items?clientId=${selectedClient}`)),
+                fetch(apiUrl(`/api/portal/feedback?clientId=${selectedClient}`)),
+                fetch(apiUrl(`/api/portal/auth?clientId=${selectedClient}`)),
+                fetch(apiUrl(`/api/invoices?clientId=${selectedClient}`)),
             ]);
             if (crRes.ok) { const d = await crRes.json(); setProjects(p => ({ ...p, creative: d.items || [] })); }
             if (pjRes.ok) { const d = await pjRes.json(); setProjects(p => ({ ...p, production: d.items || [] })); }
@@ -81,7 +82,7 @@ export default function PortalPage() {
 
     const submitFeedback = async () => {
         if (!selectedClient) return;
-        await fetch('/api/portal/feedback', {
+        await fetch(apiUrl('/api/portal/feedback'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...feedbackForm, clientId: selectedClient }),
         });
@@ -91,7 +92,7 @@ export default function PortalPage() {
 
     const grantAccess = async () => {
         if (!selectedClient) return;
-        await fetch('/api/portal/auth', {
+        await fetch(apiUrl('/api/portal/auth'), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...accessForm, clientId: selectedClient }),
         });

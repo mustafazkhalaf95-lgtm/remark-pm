@@ -1,342 +1,299 @@
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-    console.log('🌱 Seeding Remark PM database...');
+    console.log('🌱 Seeding Remark PM database...\n');
 
-    // ==================== USERS ====================
-    const passwordHash = await bcrypt.hash('remark2026', 12);
-
-    const users = await Promise.all([
-        prisma.user.create({ data: { email: 'mustafa@remark.iq', name: 'Mustafa Khalaf', password: passwordHash, role: 'CEO' } }),
-        prisma.user.create({ data: { email: 'yousif@remark.iq', name: 'Yousif (COO)', password: passwordHash, role: 'COO' } }),
-        prisma.user.create({ data: { email: 'ahmed@remark.iq', name: 'Ahmed (Creative Manager)', password: passwordHash, role: 'CREATIVE_MANAGER' } }),
-        prisma.user.create({ data: { email: 'hassanin@remark.iq', name: 'Hassanin (Production Manager)', password: passwordHash, role: 'PRODUCTION_MANAGER' } }),
-        prisma.user.create({ data: { email: 'marketing@remark.iq', name: 'Marketing Manager', password: passwordHash, role: 'MARKETING' } }),
-        prisma.user.create({ data: { email: 'mohammed@remark.iq', name: 'Mohammed (Copywriter)', password: passwordHash, role: 'COPYWRITER' } }),
-        prisma.user.create({ data: { email: 'abdullah@remark.iq', name: 'Abdullah (Designer)', password: passwordHash, role: 'DESIGNER' } }),
-        prisma.user.create({ data: { email: 'saif@remark.iq', name: 'Saif (Account Manager)', password: passwordHash, role: 'ACCOUNT_MANAGER' } }),
-        prisma.user.create({ data: { email: 'wedyan@remark.iq', name: 'Wedyan (Account Manager)', password: passwordHash, role: 'ACCOUNT_MANAGER' } }),
-        prisma.user.create({ data: { email: 'social@remark.iq', name: 'Social Media Specialist', password: passwordHash, role: 'MARKETING' } }),
-        prisma.user.create({ data: { email: 'ibrahim@remark.iq', name: 'Ibrahim Alakeel', password: passwordHash, role: 'MEMBER' } }),
-        prisma.user.create({ data: { email: 'musa@remark.iq', name: 'Musa (Production)', password: passwordHash, role: 'PRODUCTION_MANAGER' } }),
-    ]);
-
-    const [mustafa, yousif, ahmed, hassanin, marketingMgr, mohammed, abdullah, saif, wedyan, social, ibrahim, musa] = users;
-    console.log(`  ✅ Created ${users.length} users`);
-
-    // ==================== WORKSPACE ====================
-    const workspace = await prisma.workspace.create({
-        data: { name: 'Remark', description: 'Remark Creative Agency Workspace' },
+    // ═══════════════════════════════════════════════════════════
+    // 1. ORGANIZATION
+    // ═══════════════════════════════════════════════════════════
+    const org = await prisma.organization.create({
+        data: {
+            name: 'Remark',
+            nameAr: 'ريمارك',
+            timezone: 'Asia/Baghdad',
+            language: 'ar',
+            workWeek: 'sun-thu',
+        },
     });
+    console.log('  ✅ Organization created');
 
-    // Add all users as workspace members
-    await Promise.all(
-        users.map((u, i) =>
-            prisma.workspaceMember.create({
-                data: {
-                    userId: u.id,
-                    workspaceId: workspace.id,
-                    role: i === 0 ? 'ADMIN' : 'MEMBER',
-                },
-            })
-        )
-    );
-    console.log('  ✅ Created workspace & members');
-
-    // ==================== CUSTOM FIELDS ====================
-    const fields = await Promise.all([
-        prisma.customField.create({
-            data: {
-                name: 'creativeState', displayName: 'Creative State', fieldType: 'LIST',
-                options: JSON.stringify([
-                    { value: 'briefing', label: 'Briefing' },
-                    { value: 'in_progress', label: 'In Progress' },
-                    { value: 'ready_to_review', label: 'Ready to Review' },
-                    { value: 'ready_to_production', label: 'Ready to Production' },
-                ]),
-                workspaceId: workspace.id,
-            },
-        }),
-        prisma.customField.create({
-            data: {
-                name: 'contentType', displayName: 'نوع المحتوى', fieldType: 'LIST',
-                options: JSON.stringify([
-                    { value: 'video', label: 'فيديو' },
-                    { value: 'design', label: 'تصميم' },
-                    { value: 'reel', label: 'Reel' },
-                    { value: 'story', label: 'Story' },
-                ]),
-                workspaceId: workspace.id, position: 1,
-            },
-        }),
-        prisma.customField.create({
-            data: {
-                name: 'productionState', displayName: 'حاله البرودكشن', fieldType: 'LIST',
-                options: JSON.stringify([
-                    { value: 'ready_to_shoot', label: 'جاهز للتصوير' },
-                    { value: 'shooting', label: 'تصوير' },
-                    { value: 'editing', label: 'مونتاج' },
-                    { value: 'review_requested', label: 'طلب مراجعة' },
-                    { value: 'needs_logistics', label: 'بحاجه للوجستيات' },
-                ]),
-                workspaceId: workspace.id, position: 2,
-            },
-        }),
-        prisma.customField.create({
-            data: {
-                name: 'taskAssignment', displayName: 'توكيل المهمه', fieldType: 'LIST',
-                options: JSON.stringify([
-                    { value: 'hassanin', label: 'حسنين' },
-                    { value: 'mustafa_prod', label: 'مصطفى' },
-                    { value: 'musa', label: 'موسى' },
-                ]),
-                workspaceId: workspace.id, position: 3,
-            },
-        }),
-        prisma.customField.create({
-            data: {
-                name: 'finalReview', displayName: 'تقييم نهائي', fieldType: 'LIST',
-                options: JSON.stringify([
-                    { value: 'pending', label: 'قيد المراجعة' },
-                    { value: 'client_approved', label: 'موافق كلاينت' },
-                    { value: 'rejected', label: 'مرفوض' },
-                    { value: 'revision_needed', label: 'يحتاج تعديل' },
-                ]),
-                workspaceId: workspace.id, position: 4,
-            },
-        }),
-        prisma.customField.create({
-            data: {
-                name: 'publishDate', displayName: 'تاريخ النشر', fieldType: 'DATE',
-                options: '[]',
-                workspaceId: workspace.id, position: 5,
-            },
-        }),
-    ]);
-
-    const [creativeStateField, contentTypeField, productionStateField, taskAssignmentField, finalReviewField, publishDateField] = fields;
-    console.log(`  ✅ Created ${fields.length} custom fields`);
-
-    // ==================== BOARDS ====================
-    const boardColors = ['#6366f1', '#8b5cf6', '#06b6d4', '#22c55e', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316', '#3b82f6', '#a855f7', '#84cc16', '#64748b'];
-
-    const boardDefs = [
-        { name: 'CEO', color: boardColors[0], type: 'PIPELINE', lists: ['CEO Creative Reviewing', 'In Progress', 'CEO Final Reviewing', 'Client Approved'] },
-        { name: 'COO', color: boardColors[1], type: 'PIPELINE', lists: ['COO Review', 'In Progress', 'Approved', 'Rejected'] },
-        { name: 'creative team', color: boardColors[2], type: 'KANBAN', lists: ['Briefes', 'الوردة', 'الشهيرة', 'كلفنك', 'ريحانة السكني', 'زمزم', 'ريحانة بارك', 'ريحانة كروب', 'My Time'] },
-        { name: 'marketing', color: boardColors[3], type: 'PIPELINE', lists: ['Strategy', 'Content Plan', 'In Review', 'Approved', 'Scheduled', 'Published', 'Archive'] },
-        { name: 'production', color: boardColors[4], type: 'KANBAN', lists: ['Production', 'لوجستيات', 'Hassanin', 'Musa', 'Mustafa'] },
-        { name: 'publish', color: boardColors[5], type: 'PIPELINE', lists: ['Ready', 'Scheduled', 'Published', 'Archive'] },
-        { name: 'الوردة', color: boardColors[6], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
-        { name: 'الشهيرة', color: boardColors[7], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
-        { name: 'كلفنك', color: boardColors[8], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
-        { name: 'زمزم', color: boardColors[9], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
-        { name: 'ريحانة السكني', color: boardColors[10], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
-        { name: 'ريحانة بارك', color: boardColors[11], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
-        { name: 'مجموعة ريحانة', color: boardColors[12], type: 'PIPELINE', lists: ['Marketing', 'Creative', 'Production', 'Reviewing', 'Publishing & Promoting', 'Done', 'Reject'] },
+    // ═══════════════════════════════════════════════════════════
+    // 2. DEPARTMENTS
+    // ═══════════════════════════════════════════════════════════
+    const deptDefs = [
+        { name: 'Marketing', nameAr: 'التسويق', slug: 'marketing', color: '#22c55e', icon: '📋' },
+        { name: 'Creative', nameAr: 'الإبداعي', slug: 'creative', color: '#8b5cf6', icon: '🎨' },
+        { name: 'Production', nameAr: 'الإنتاج', slug: 'production', color: '#f59e0b', icon: '🎬' },
+        { name: 'Publishing', nameAr: 'النشر', slug: 'publishing', color: '#ef4444', icon: '📢' },
+        { name: 'Operations', nameAr: 'العمليات', slug: 'operations', color: '#6366f1', icon: '⚙️' },
     ];
 
-    const boards: Record<string, any> = {};
+    const departments: Record<string, any> = {};
+    for (const d of deptDefs) {
+        departments[d.slug] = await prisma.department.create({
+            data: { ...d, organizationId: org.id },
+        });
+    }
+    console.log(`  ✅ ${deptDefs.length} departments created`);
 
-    for (let i = 0; i < boardDefs.length; i++) {
-        const def = boardDefs[i];
-        const board = await prisma.board.create({
+    // ═══════════════════════════════════════════════════════════
+    // 3. POSITIONS CATALOG
+    // ═══════════════════════════════════════════════════════════
+    const positionDefs = [
+        // Executive
+        { title: 'Chief Executive Officer', titleAr: 'الرئيس التنفيذي', category: 'executive', level: 4, isDefault: true },
+        { title: 'Chief Operating Officer', titleAr: 'مدير العمليات', category: 'executive', level: 4, isDefault: true },
+        // Client / Account
+        { title: 'Account Director', titleAr: 'مدير الحسابات', category: 'client', level: 3, isDefault: true },
+        { title: 'Senior Account Manager', titleAr: 'مدير حسابات أول', category: 'client', level: 2, isDefault: true },
+        { title: 'Account Manager', titleAr: 'مدير حسابات', category: 'client', level: 2, isDefault: true },
+        // Marketing
+        { title: 'Marketing Director', titleAr: 'مدير التسويق', category: 'marketing', level: 3, isDefault: true },
+        { title: 'Marketing Manager', titleAr: 'مدير تسويق', category: 'marketing', level: 2, isDefault: true },
+        { title: 'Content Strategist', titleAr: 'استراتيجي محتوى', category: 'marketing', level: 1, isDefault: true },
+        { title: 'Social Media Manager', titleAr: 'مدير سوشيال ميديا', category: 'marketing', level: 1, isDefault: true },
+        { title: 'Performance Marketer', titleAr: 'مسوّق أداء', category: 'marketing', level: 1, isDefault: true },
+        { title: 'Media Buyer', titleAr: 'مشتري إعلانات', category: 'marketing', level: 1, isDefault: true },
+        { title: 'Community Manager', titleAr: 'مدير مجتمع', category: 'marketing', level: 1, isDefault: true },
+        // Creative
+        { title: 'Creative Director', titleAr: 'المدير الإبداعي', category: 'creative', level: 3, isDefault: true },
+        { title: 'Art Director', titleAr: 'المدير الفني', category: 'creative', level: 2, isDefault: true },
+        { title: 'Senior Designer', titleAr: 'مصمم أول', category: 'creative', level: 1, isDefault: true },
+        { title: 'Graphic Designer', titleAr: 'مصمم جرافيك', category: 'creative', level: 0, isDefault: true },
+        { title: 'Copywriter', titleAr: 'كاتب محتوى', category: 'creative', level: 0, isDefault: true },
+        // Production
+        { title: 'Production Manager', titleAr: 'مدير الإنتاج', category: 'production', level: 2, isDefault: true },
+        { title: 'Production Coordinator', titleAr: 'منسق إنتاج', category: 'production', level: 1, isDefault: true },
+        { title: 'Videographer', titleAr: 'مصور فيديو', category: 'production', level: 0, isDefault: true },
+        { title: 'Photographer', titleAr: 'مصور فوتوغرافي', category: 'production', level: 0, isDefault: true },
+        { title: 'Editor', titleAr: 'مونتير', category: 'production', level: 0, isDefault: true },
+        { title: 'Motion Designer', titleAr: 'مصمم موشن', category: 'production', level: 0, isDefault: true },
+        // Publishing
+        { title: 'Publishing Manager', titleAr: 'مدير النشر', category: 'publishing', level: 2, isDefault: true },
+        { title: 'Publisher', titleAr: 'ناشر', category: 'publishing', level: 0, isDefault: true },
+        { title: 'QA / Traffic Coordinator', titleAr: 'منسق جودة', category: 'publishing', level: 1, isDefault: true },
+        // Admin
+        { title: 'System Administrator', titleAr: 'مدير النظام', category: 'admin', level: 3, isDefault: true },
+        { title: 'Operations Administrator', titleAr: 'مدير العمليات التشغيلية', category: 'admin', level: 2, isDefault: true },
+    ];
+
+    const positions: Record<string, any> = {};
+    for (const p of positionDefs) {
+        positions[p.title] = await prisma.position.create({ data: p });
+    }
+    console.log(`  ✅ ${positionDefs.length} positions created`);
+
+    // ═══════════════════════════════════════════════════════════
+    // 4. ROLES & PERMISSIONS
+    // ═══════════════════════════════════════════════════════════
+    const permissionDefs = [
+        // Settings
+        { code: 'settings.view', name: 'View Settings', nameAr: 'عرض الإعدادات', module: 'settings', category: 'view' },
+        { code: 'settings.manage', name: 'Manage Settings', nameAr: 'إدارة الإعدادات', module: 'settings', category: 'manage' },
+        { code: 'settings.users.manage', name: 'Manage Users', nameAr: 'إدارة المستخدمين', module: 'settings', category: 'manage' },
+        { code: 'settings.roles.manage', name: 'Manage Roles', nameAr: 'إدارة الأدوار', module: 'settings', category: 'manage' },
+        { code: 'settings.departments.manage', name: 'Manage Departments', nameAr: 'إدارة الأقسام', module: 'settings', category: 'manage' },
+        { code: 'settings.integrations.manage', name: 'Manage Integrations', nameAr: 'إدارة التكاملات', module: 'settings', category: 'manage' },
+        // Boards
+        { code: 'marketing.view', name: 'View Marketing', nameAr: 'عرض التسويق', module: 'marketing', category: 'view' },
+        { code: 'marketing.manage', name: 'Manage Marketing', nameAr: 'إدارة التسويق', module: 'marketing', category: 'manage' },
+        { code: 'creative.view', name: 'View Creative', nameAr: 'عرض الإبداعي', module: 'creative', category: 'view' },
+        { code: 'creative.manage', name: 'Manage Creative', nameAr: 'إدارة الإبداعي', module: 'creative', category: 'manage' },
+        { code: 'production.view', name: 'View Production', nameAr: 'عرض الإنتاج', module: 'production', category: 'view' },
+        { code: 'production.manage', name: 'Manage Production', nameAr: 'إدارة الإنتاج', module: 'production', category: 'manage' },
+        { code: 'publishing.view', name: 'View Publishing', nameAr: 'عرض النشر', module: 'publishing', category: 'view' },
+        { code: 'publishing.manage', name: 'Manage Publishing', nameAr: 'إدارة النشر', module: 'publishing', category: 'manage' },
+        // Clients
+        { code: 'clients.view', name: 'View Clients', nameAr: 'عرض العملاء', module: 'clients', category: 'view' },
+        { code: 'clients.manage', name: 'Manage Clients', nameAr: 'إدارة العملاء', module: 'clients', category: 'manage' },
+        // Reports
+        { code: 'reports.view', name: 'View Reports', nameAr: 'عرض التقارير', module: 'reports', category: 'view' },
+        { code: 'reports.export', name: 'Export Reports', nameAr: 'تصدير التقارير', module: 'reports', category: 'export' },
+        // Approvals
+        { code: 'approvals.concept_preliminary', name: 'Approve Concept (Preliminary)', nameAr: 'موافقة أولية على المفهوم', module: 'approvals', category: 'approve' },
+        { code: 'approvals.concept_final', name: 'Approve Concept (Final)', nameAr: 'موافقة نهائية على المفهوم', module: 'approvals', category: 'approve' },
+        { code: 'approvals.export', name: 'Approve Exports', nameAr: 'موافقة على التصدير', module: 'approvals', category: 'approve' },
+        { code: 'approvals.publishing', name: 'Approve Publishing', nameAr: 'موافقة على النشر', module: 'approvals', category: 'approve' },
+        { code: 'approvals.unblock', name: 'Unblock Workflow', nameAr: 'إلغاء حظر سير العمل', module: 'approvals', category: 'approve' },
+    ];
+
+    const permissions: Record<string, any> = {};
+    for (const p of permissionDefs) {
+        permissions[p.code] = await prisma.permission.create({ data: p });
+    }
+    console.log(`  ✅ ${permissionDefs.length} permissions created`);
+
+    // Roles
+    const roleDefs = [
+        { name: 'ceo', nameAr: 'الرئيس التنفيذي', description: 'Full platform access', descriptionAr: 'صلاحيات كاملة للمنصة', scope: 'platform', isSystem: true },
+        { name: 'coo', nameAr: 'مدير العمليات', description: 'Operations oversight', descriptionAr: 'إشراف على العمليات', scope: 'platform', isSystem: true },
+        { name: 'admin', nameAr: 'مدير النظام', description: 'System administration', descriptionAr: 'إدارة النظام', scope: 'platform', isSystem: true },
+        { name: 'department_head', nameAr: 'رئيس قسم', description: 'Department management', descriptionAr: 'إدارة القسم', scope: 'department', isSystem: true },
+        { name: 'account_manager', nameAr: 'مدير حسابات', description: 'Client account management', descriptionAr: 'إدارة حسابات العملاء', scope: 'platform', isSystem: true },
+        { name: 'marketing_manager', nameAr: 'مدير تسويق', description: 'Marketing department lead', descriptionAr: 'مسؤول قسم التسويق', scope: 'department', isSystem: false },
+        { name: 'creative_director', nameAr: 'المدير الإبداعي', description: 'Creative department lead', descriptionAr: 'مسؤول القسم الإبداعي', scope: 'department', isSystem: false },
+        { name: 'production_manager', nameAr: 'مدير الإنتاج', description: 'Production department lead', descriptionAr: 'مسؤول قسم الإنتاج', scope: 'department', isSystem: false },
+        { name: 'publishing_manager', nameAr: 'مدير النشر', description: 'Publishing department lead', descriptionAr: 'مسؤول قسم النشر', scope: 'department', isSystem: false },
+        { name: 'staff', nameAr: 'موظف', description: 'Regular team member', descriptionAr: 'عضو فريق عادي', scope: 'department', isSystem: true },
+        { name: 'reviewer', nameAr: 'مراجع', description: 'Can review and comment', descriptionAr: 'يمكنه المراجعة والتعليق', scope: 'department', isSystem: false },
+        { name: 'viewer', nameAr: 'مشاهد', description: 'Read-only access', descriptionAr: 'عرض فقط', scope: 'department', isSystem: true },
+    ];
+
+    const roles: Record<string, any> = {};
+    for (const r of roleDefs) {
+        roles[r.name] = await prisma.role.create({ data: r });
+    }
+    console.log(`  ✅ ${roleDefs.length} roles created`);
+
+    // Assign ALL permissions to CEO & Admin
+    const allPermCodes = Object.keys(permissions);
+    for (const code of allPermCodes) {
+        await prisma.rolePermission.create({ data: { roleId: roles['ceo'].id, permissionId: permissions[code].id } });
+        await prisma.rolePermission.create({ data: { roleId: roles['admin'].id, permissionId: permissions[code].id } });
+    }
+    // COO gets everything except settings.roles.manage
+    for (const code of allPermCodes.filter(c => c !== 'settings.roles.manage')) {
+        await prisma.rolePermission.create({ data: { roleId: roles['coo'].id, permissionId: permissions[code].id } });
+    }
+    // Account Manager
+    for (const code of ['marketing.view', 'creative.view', 'production.view', 'publishing.view', 'clients.view', 'clients.manage', 'reports.view', 'reports.export', 'approvals.concept_final']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['account_manager'].id, permissionId: permissions[code].id } });
+    }
+    // Department Head
+    for (const code of ['clients.view', 'reports.view', 'reports.export']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['department_head'].id, permissionId: permissions[code].id } });
+    }
+    // Creative Director
+    for (const code of ['creative.view', 'creative.manage', 'clients.view', 'reports.view', 'approvals.concept_preliminary', 'approvals.unblock']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['creative_director'].id, permissionId: permissions[code].id } });
+    }
+    // Marketing Manager
+    for (const code of ['marketing.view', 'marketing.manage', 'clients.view', 'clients.manage', 'reports.view', 'reports.export']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['marketing_manager'].id, permissionId: permissions[code].id } });
+    }
+    // Production Manager
+    for (const code of ['production.view', 'production.manage', 'clients.view', 'reports.view']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['production_manager'].id, permissionId: permissions[code].id } });
+    }
+    // Publishing Manager
+    for (const code of ['publishing.view', 'publishing.manage', 'clients.view', 'approvals.publishing']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['publishing_manager'].id, permissionId: permissions[code].id } });
+    }
+    // Staff — department-scoped view only
+    for (const code of ['clients.view', 'reports.view']) {
+        await prisma.rolePermission.create({ data: { roleId: roles['staff'].id, permissionId: permissions[code].id } });
+    }
+    // Viewer
+    await prisma.rolePermission.create({ data: { roleId: roles['viewer'].id, permissionId: permissions['clients.view'].id } });
+
+    console.log('  ✅ Role-permission mappings created');
+
+    // ═══════════════════════════════════════════════════════════
+    // 5. USERS & PROFILES
+    // ═══════════════════════════════════════════════════════════
+    const userDefs = [
+        { email: 'mustafa@remark.iq', fullName: 'مصطفى خلف', fullNameAr: 'مصطفى خلف', displayName: 'Mustafa Khalaf', displayNameAr: 'مصطفى', position: 'Chief Executive Officer', role: 'ceo', department: 'operations', avatar: 'م.خ', employeeCode: 'RMK-001' },
+        { email: 'yousif@remark.iq', fullName: 'يوسف', fullNameAr: 'يوسف', displayName: 'Yousif', displayNameAr: 'يوسف', position: 'Chief Operating Officer', role: 'coo', department: 'operations', avatar: 'ي', employeeCode: 'RMK-002' },
+        { email: 'saif@remark.iq', fullName: 'سيف', fullNameAr: 'سيف', displayName: 'Saif', displayNameAr: 'سيف', position: 'Account Manager', role: 'account_manager', department: 'operations', avatar: 'س', employeeCode: 'RMK-003' },
+        { email: 'wedyan@remark.iq', fullName: 'وديان', fullNameAr: 'وديان', displayName: 'Wedyan', displayNameAr: 'وديان', position: 'Account Manager', role: 'account_manager', department: 'operations', avatar: 'و', employeeCode: 'RMK-004' },
+        { email: 'ahmed@remark.iq', fullName: 'أحمد', fullNameAr: 'أحمد', displayName: 'Ahmed', displayNameAr: 'أحمد', position: 'Creative Director', role: 'creative_director', department: 'creative', avatar: 'أ', employeeCode: 'RMK-005' },
+        { email: 'abdullah@remark.iq', fullName: 'عبدالله', fullNameAr: 'عبدالله', displayName: 'Abdullah', displayNameAr: 'عبدالله', position: 'Graphic Designer', role: 'staff', department: 'creative', avatar: 'ع', employeeCode: 'RMK-006' },
+        { email: 'mohammed@remark.iq', fullName: 'محمد', fullNameAr: 'محمد', displayName: 'Mohammed', displayNameAr: 'محمد', position: 'Copywriter', role: 'staff', department: 'creative', avatar: 'م', employeeCode: 'RMK-007' },
+        { email: 'marketing@remark.iq', fullName: 'مدير التسويق', fullNameAr: 'مدير التسويق', displayName: 'Marketing Manager', displayNameAr: 'مدير التسويق', position: 'Marketing Manager', role: 'marketing_manager', department: 'marketing', avatar: 'ت', employeeCode: 'RMK-008' },
+        { email: 'hassanin@remark.iq', fullName: 'حسنين', fullNameAr: 'حسنين', displayName: 'Hassanin', displayNameAr: 'حسنين', position: 'Production Manager', role: 'production_manager', department: 'production', avatar: 'ح', employeeCode: 'RMK-009' },
+        { email: 'musa@remark.iq', fullName: 'موسى', fullNameAr: 'موسى', displayName: 'Musa', displayNameAr: 'موسى', position: 'Videographer', role: 'staff', department: 'production', avatar: 'م', employeeCode: 'RMK-010' },
+        { email: 'social@remark.iq', fullName: 'أخصائي سوشيال', fullNameAr: 'أخصائي سوشيال', displayName: 'Social Specialist', displayNameAr: 'أخصائي سوشيال', position: 'Social Media Manager', role: 'staff', department: 'marketing', avatar: 'ش', employeeCode: 'RMK-011' },
+        { email: 'ibrahim@remark.iq', fullName: 'إبراهيم', fullNameAr: 'إبراهيم', displayName: 'Ibrahim', displayNameAr: 'إبراهيم', position: 'Publisher', role: 'staff', department: 'publishing', avatar: 'إ', employeeCode: 'RMK-012' },
+    ];
+
+    for (const u of userDefs) {
+        const user = await prisma.user.create({ data: { email: u.email, password: '', status: 'active' } });
+        await prisma.userProfile.create({
             data: {
-                name: def.name,
-                color: def.color,
-                boardType: def.type,
-                position: i,
-                workspaceId: workspace.id,
+                userId: user.id,
+                fullName: u.fullName,
+                fullNameAr: u.fullNameAr,
+                displayName: u.displayName,
+                displayNameAr: u.displayNameAr,
+                avatar: u.avatar,
+                employeeCode: u.employeeCode,
+                positionId: positions[u.position]?.id,
             },
         });
-
-        // Create lists for each board
-        for (let j = 0; j < def.lists.length; j++) {
-            await prisma.list.create({
-                data: { name: def.lists[j], position: j, boardId: board.id },
-            });
-        }
-
-        // Link custom fields to each board
-        for (const field of fields) {
-            await prisma.boardCustomField.create({
-                data: { boardId: board.id, fieldId: field.id },
-            });
-        }
-
-        boards[def.name] = board;
+        await prisma.userRole.create({ data: { userId: user.id, roleId: roles[u.role].id, isPrimary: true } });
+        await prisma.userDepartment.create({ data: { userId: user.id, departmentId: departments[u.department].id, isPrimary: true } });
     }
-    console.log(`  ✅ Created ${boardDefs.length} boards with lists`);
+    console.log(`  ✅ ${userDefs.length} users with profiles created`);
 
-    // ==================== SAMPLE CARDS ====================
-    const creativeBoard = await prisma.board.findFirst({ where: { name: 'creative team' }, include: { lists: true } });
-    if (creativeBoard) {
-        const listMap: Record<string, string> = {};
-        creativeBoard.lists.forEach(l => { listMap[l.name] = l.id; });
+    // ═══════════════════════════════════════════════════════════
+    // 6. APPROVAL POLICIES
+    // ═══════════════════════════════════════════════════════════
+    const approvalPolicies = [
+        { name: 'Preliminary Concept Approval', nameAr: 'موافقة أولية على المفهوم', workflow: 'creative_concept', stage: 'concept_preliminary', description: 'Creative Director approves initial concept', descriptionAr: 'المدير الإبداعي يوافق على المفهوم الأولي' },
+        { name: 'Final Concept Approval', nameAr: 'موافقة نهائية على المفهوم', workflow: 'creative_concept', stage: 'concept_final', description: 'Account Manager gives final concept approval', descriptionAr: 'مدير الحسابات يعطي الموافقة النهائية على المفهوم' },
+        { name: 'Production Review', nameAr: 'مراجعة الإنتاج', workflow: 'production_review', stage: 'review', description: 'Production manager reviews deliverables', descriptionAr: 'مدير الإنتاج يراجع المخرجات' },
+        { name: 'Publishing Approval', nameAr: 'موافقة النشر', workflow: 'publishing', stage: 'approval', description: 'Account Manager approves for publishing', descriptionAr: 'مدير الحسابات يوافق على النشر' },
+    ];
 
-        const sampleCards = [
-            { name: 'فيديو top 10 ترند', list: 'الشهيرة', status: 'OPEN', creativeState: 'ready_to_review', contentType: 'video' },
-            { name: 'روتين العناية برمضان - شهر الثاني - كلفنك', list: 'كلفنك', status: 'OPEN', creativeState: 'ready_to_production', contentType: 'video', dueDate: '2026-02-23T17:00:00Z', assignment: 'mustafa_prod', productionState: 'review_requested' },
-            { name: 'تصميم رمضان و المستقبل - ريحانة بارك', list: 'ريحانة بارك', status: 'COMPLETED', contentType: 'design', dueDate: '2026-02-18T09:00:00Z' },
-            { name: 'فديو صراع حول سلة رمضان - الوردة', list: 'الوردة', status: 'OPEN', contentType: 'video', dueDate: '2026-03-02T18:00:00Z' },
-            { name: 'فديو رسالة العربات - الوردة', list: 'الوردة', status: 'COMPLETED', creativeState: 'ready_to_production', contentType: 'video', dueDate: '2026-02-27T18:00:00Z', assignment: 'hassanin', productionState: 'review_requested' },
-            { name: 'زمزم - الحمام - شهر ثاني', list: 'زمزم', status: 'OPEN', creativeState: 'ready_to_review', contentType: 'video', dueDate: '2026-03-01T18:00:00Z' },
-            { name: 'زمزم - بالكونة - شهر الثاني', list: 'زمزم', status: 'OPEN', creativeState: 'ready_to_production', contentType: 'video', dueDate: '2026-02-22T18:00:00Z' },
-            { name: 'اجواء رمضان - الوردة', list: 'الوردة', status: 'COMPLETED', creativeState: 'ready_to_production', contentType: 'video', dueDate: '2026-02-28T18:00:00Z', assignment: 'musa', productionState: 'review_requested' },
-            { name: 'الوردة - ماركتنك بريف - الشهر الثاني', list: 'Briefes', status: 'COMPLETED' },
-            { name: 'بريف كلفنك - شهر الثاني', list: 'Briefes', status: 'OPEN' },
-            { name: 'مجموعة الريحانة', list: 'Briefes', status: 'OPEN' },
-            { name: 'مجمع زمزم السكني', list: 'Briefes', status: 'OPEN' },
-            { name: 'ريحانة السكني', list: 'Briefes', status: 'OPEN' },
-            { name: 'ريحانة بارك', list: 'Briefes', status: 'OPEN' },
-            { name: 'تهنئة رمضان للفروع الثلاث - الوردة', list: 'الوردة', status: 'COMPLETED', contentType: 'design', dueDate: '2026-02-18T18:00:00Z' },
-            { name: 'ريحانة كروب- تقرير تعليمي (رؤية كربلاء الاقتصادية)', list: 'ريحانة كروب', status: 'OPEN', contentType: 'video', dueDate: '2026-02-19T18:00:00Z' },
-            { name: 'تصميم لغة الارقام - ريحانة كروب', list: 'ريحانة كروب', status: 'OPEN', contentType: 'design', dueDate: '2026-02-22T18:00:00Z' },
-            { name: 'إعلان عزوز وروان - كلفنك', list: 'كلفنك', status: 'OPEN', contentType: 'video', dueDate: '2026-03-05T18:00:00Z' },
-            { name: 'تصميم عرض خاص رمضان - كلفنك', list: 'كلفنك', status: 'OPEN', contentType: 'design', dueDate: '2026-03-01T12:00:00Z' },
-            { name: 'فديو لايف ستايل منتجات - ريحانة السكني', list: 'ريحانة السكني', status: 'OPEN', contentType: 'video', dueDate: '2026-03-03T18:00:00Z' },
-        ];
-
-        for (let i = 0; i < sampleCards.length; i++) {
-            const sc = sampleCards[i];
-            const listId = listMap[sc.list];
-            if (!listId) continue;
-
-            const card = await prisma.card.create({
-                data: {
-                    name: sc.name,
-                    listId,
-                    position: i * 65536,
-                    status: sc.status || 'OPEN',
-                    dueDate: sc.dueDate ? new Date(sc.dueDate) : undefined,
-                    mirrorGroupId: `mirror_${i}`,
-                },
-            });
-
-            // Set custom field values
-            if (sc.creativeState) {
-                await prisma.cardFieldValue.create({ data: { cardId: card.id, fieldId: creativeStateField.id, value: sc.creativeState } });
-            }
-            if (sc.contentType) {
-                await prisma.cardFieldValue.create({ data: { cardId: card.id, fieldId: contentTypeField.id, value: sc.contentType } });
-            }
-            if (sc.productionState) {
-                await prisma.cardFieldValue.create({ data: { cardId: card.id, fieldId: productionStateField.id, value: sc.productionState } });
-            }
-            if (sc.assignment) {
-                await prisma.cardFieldValue.create({ data: { cardId: card.id, fieldId: taskAssignmentField.id, value: sc.assignment } });
-            }
-
-            // Assign cards to relevant users
-            if (sc.assignment === 'hassanin') {
-                await prisma.cardAssignee.create({ data: { cardId: card.id, userId: hassanin.id } });
-            } else if (sc.assignment === 'mustafa_prod') {
-                await prisma.cardAssignee.create({ data: { cardId: card.id, userId: mustafa.id } });
-            } else if (sc.assignment === 'musa') {
-                await prisma.cardAssignee.create({ data: { cardId: card.id, userId: musa.id } });
-            }
-        }
-        console.log(`  ✅ Created ${sampleCards.length} sample cards with attributes`);
+    for (const ap of approvalPolicies) {
+        await prisma.approvalPolicy.create({ data: ap });
     }
+    console.log(`  ✅ ${approvalPolicies.length} approval policies created`);
 
-    // ==================== DEFAULT CHANNELS ====================
-    const generalChannel = await prisma.channel.create({
-        data: {
-            name: 'عام',
-            description: 'قناة النقاش العامة لفريق Remark',
-            channelType: 'PUBLIC',
-            workspaceId: workspace.id,
-        },
-    });
-    const creativeChannel = await prisma.channel.create({
-        data: {
-            name: 'الفريق الإبداعي',
-            description: 'نقاشات الفريق الإبداعي والمحتوى',
-            channelType: 'PUBLIC',
-            workspaceId: workspace.id,
-        },
-    });
-    const productionChannel = await prisma.channel.create({
-        data: {
-            name: 'البرودكشن',
-            description: 'متابعة الإنتاج والتصوير',
-            channelType: 'PUBLIC',
-            workspaceId: workspace.id,
-        },
-    });
+    // ═══════════════════════════════════════════════════════════
+    // 7. SAMPLE CLIENTS
+    // ═══════════════════════════════════════════════════════════
+    const clientDefs = [
+        { name: 'الوردة', nameAr: 'الوردة', sector: 'Restaurants & Cafés', sectorAr: 'مطاعم ومقاهي', planType: 'شهرية', budget: '5,000', avatar: '🌹' },
+        { name: 'ريحانة', nameAr: 'ريحانة', sector: 'Real Estate', sectorAr: 'عقارات', planType: 'سنوية', budget: '15,000', avatar: '🏠' },
+        { name: 'كلفنك', nameAr: 'كلفنك', sector: 'Beauty & Personal Care', sectorAr: 'جمال وعناية', planType: 'شهرية', budget: '3,000', avatar: '💄' },
+        { name: 'زمزم', nameAr: 'زمزم', sector: 'Real Estate', sectorAr: 'عقارات', planType: 'شهرية', budget: '8,000', avatar: '🏗️' },
+    ];
 
-    // Add all users to general channel
-    for (const user of users) {
-        await prisma.channelMember.create({ data: { channelId: generalChannel.id, userId: user.id } });
+    for (const c of clientDefs) {
+        await prisma.client.create({ data: c });
     }
-    // Add creative team to creative channel
-    for (const user of [mustafa, ahmed, mohammed, abdullah, marketingMgr]) {
-        await prisma.channelMember.create({ data: { channelId: creativeChannel.id, userId: user.id } });
-    }
-    // Add production team to production channel
-    for (const user of [mustafa, hassanin, musa, yousif]) {
-        await prisma.channelMember.create({ data: { channelId: productionChannel.id, userId: user.id } });
-    }
-    console.log('  ✅ Created default channels');
+    console.log(`  ✅ ${clientDefs.length} clients created`);
 
-    // ==================== AUTOMATION RULES ====================
-    await prisma.automationRule.create({
-        data: {
-            name: 'Auto-Mirror to Production',
-            description: 'When creative state changes to "ready to production", mirror card to production board',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: JSON.stringify({ fieldName: 'creativeState', toValue: 'ready_to_production' }),
-            actions: JSON.stringify([{ type: 'MIRROR', targetBoard: 'production' }, { type: 'NOTIFY', message: 'بطاقة جديدة جاهزة للبرودكشن' }]),
-            workspaceId: workspace.id,
-        },
-    });
-    await prisma.automationRule.create({
-        data: {
-            name: 'Auto-Mirror to CEO Review',
-            description: 'When production state changes to "review requested", mirror card to CEO board',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: JSON.stringify({ fieldName: 'productionState', toValue: 'review_requested' }),
-            actions: JSON.stringify([{ type: 'MIRROR', targetBoard: 'CEO' }, { type: 'NOTIFY', message: 'بطاقة جاهزة للمراجعة النهائية' }]),
-            workspaceId: workspace.id,
-        },
-    });
-    await prisma.automationRule.create({
-        data: {
-            name: 'Auto-Mirror to Publish',
-            description: 'When final review is "client approved", mirror card to publish board',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: JSON.stringify({ fieldName: 'finalReview', toValue: 'client_approved' }),
-            actions: JSON.stringify([{ type: 'MIRROR', targetBoard: 'publish' }, { type: 'NOTIFY', message: 'محتوى موافق عليه — جاهز للنشر' }]),
-            workspaceId: workspace.id,
-        },
-    });
-    await prisma.automationRule.create({
-        data: {
-            name: 'Notify on Assignment',
-            description: 'When a task is assigned, notify the assigned user',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: JSON.stringify({ fieldName: 'taskAssignment' }),
-            actions: JSON.stringify([{ type: 'NOTIFY', message: 'تم توكيلك بمهمة جديدة' }]),
-            workspaceId: workspace.id,
-        },
-    });
-    await prisma.automationRule.create({
-        data: {
-            name: 'Due Date Alert',
-            description: 'Notify assignees when due date is within 24 hours',
-            trigger: 'DUE_DATE',
-            triggerConfig: JSON.stringify({ hoursBeforeDue: 24 }),
-            actions: JSON.stringify([{ type: 'NOTIFY', message: 'موعد تسليم قريب!' }]),
-            workspaceId: workspace.id,
-        },
-    });
-    console.log('  ✅ Created 5 automation rules');
+    // ═══════════════════════════════════════════════════════════
+    // 8. SYSTEM SETTINGS
+    // ═══════════════════════════════════════════════════════════
+    const settingsDefs = [
+        { category: 'general', key: 'company_name', value: 'Remark' },
+        { category: 'general', key: 'company_name_ar', value: 'ريمارك' },
+        { category: 'general', key: 'default_language', value: 'ar' },
+        { category: 'general', key: 'timezone', value: 'Asia/Baghdad' },
+        { category: 'notifications', key: 'email_enabled', value: 'false' },
+        { category: 'notifications', key: 'deadline_alert_hours', value: '24' },
+        { category: 'security', key: 'session_timeout_minutes', value: '480' },
+        { category: 'security', key: 'max_login_attempts', value: '5' },
+        { category: 'branding', key: 'primary_color', value: '#6366f1' },
+        { category: 'branding', key: 'logo_url', value: '' },
+    ];
+
+    for (const s of settingsDefs) {
+        await prisma.systemSetting.create({ data: { ...s, organizationId: org.id } });
+    }
+    console.log(`  ✅ ${settingsDefs.length} system settings created`);
+
+    // ═══════════════════════════════════════════════════════════
+    // 9. INTEGRATION SETTINGS
+    // ═══════════════════════════════════════════════════════════
+    const integrationDefs = [
+        { name: 'openai', nameAr: 'OpenAI', provider: 'OpenAI', isEnabled: false, config: JSON.stringify({ apiKey: '', model: 'gpt-4' }) },
+        { name: 'notebooklm', nameAr: 'NotebookLM', provider: 'Google', isEnabled: false, config: JSON.stringify({ projectId: '' }) },
+        { name: 'storage', nameAr: 'التخزين السحابي', provider: 'Local', isEnabled: true, config: JSON.stringify({ type: 'local', path: './uploads' }) },
+        { name: 'webhook', nameAr: 'Webhook', provider: '', isEnabled: false, config: JSON.stringify({ url: '', secret: '' }) },
+    ];
+
+    for (const i of integrationDefs) {
+        await prisma.integrationSetting.create({ data: { ...i, organizationId: org.id } });
+    }
+    console.log(`  ✅ ${integrationDefs.length} integrations created`);
 
     console.log('\n🎉 Seeding complete!');
-    console.log(`   Login: mustafa@remark.iq / remark2026`);
 }
 
 main()

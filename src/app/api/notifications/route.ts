@@ -1,36 +1,67 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { requireAuth } from '@/lib/auth';
 import prisma from '@/lib/prisma';
+import { parsePagination, sendPaginated } from '@/lib/routeHandlers';
+import { errorToResponse } from '@/lib/apiError';
 
-// GET /api/notifications
-export async function GET() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+// GET /api/notifications — list user's notifications
+export async function GET(req: Request) {
+    const auth = await requireAuth();
+    if (auth.error) return auth.error;
 
-    const userId = (session.user as any).id;
-    const notifications = await prisma.notification.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 50,
-    });
+    try {
+        const userId = auth.session.user.id;
+        const { take, skip } = parsePagination(req.url);
 
-    return NextResponse.json(notifications);
+        const [items, total, unreadCount] = await Promise.all([
+            prisma.notification.findMany({
+                where: { userId },
+                orderBy: { createdAt: 'desc' },
+                take,
+                skip,
+            }),
+            prisma.notification.count({ where: { userId } }),
+            prisma.notification.count({ where: { userId, isRead: false } }),
+        ]);
+
+        return NextResponse.json({
+            data: items,
+            total,
+            unreadCount,
+            take,
+            skip,
+            hasMore: skip + take < total,
+        });
+    } catch (error) {
+        return errorToResponse(error);
+    }
 }
 
-// PUT /api/notifications — mark as read
-export async function PUT(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+// PUT /api/notifications — mark notifications as read (bulk)
+export async function PUT(req: Request) {
+    const auth = await requireAuth();
+    if (auth.error) return auth.error;
 
-    const userId = (session.user as any).id;
-    const { ids } = await request.json();
+    try {
+        const userId = auth.session.user.id;
+        const body = await req.json().catch(() => ({}));
+        const { ids } = body;
 
-    if (ids && ids.length > 0) {
-        await prisma.notification.updateMany({ where: { id: { in: ids }, userId }, data: { read: true } });
-    } else {
-        await prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } });
+        if (ids && Array.isArray(ids) && ids.length > 0) {
+            await prisma.notification.updateMany({
+                where: { id: { in: ids }, userId },
+                data: { isRead: true },
+            });
+        } else {
+            // Mark all as read
+            await prisma.notification.updateMany({
+                where: { userId, isRead: false },
+                data: { isRead: true },
+            });
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        return errorToResponse(error);
     }
-
-    return NextResponse.json({ success: true });
 }

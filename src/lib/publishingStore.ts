@@ -1,4 +1,5 @@
 'use strict';
+import { TEAM } from './teamStore';
 /* Remark Publishing — Data Store v1 — 7-Stage Pipeline */
 
 // ─── Publishing Stages ───
@@ -29,14 +30,16 @@ export const POST_CAT_ICON: Record<PostCategory, string> = { social_post: '📱'
 // ─── Platforms ───
 export const PLATFORMS = ['Instagram', 'TikTok', 'Snapchat', 'X (Twitter)', 'Facebook', 'LinkedIn', 'YouTube', 'Website', 'Email'] as const;
 
-// ─── Team ───
-export const PUB_TEAM = [
-    { id: 'layla', name: 'ليلى', nameEn: 'Layla', role: 'منسقة نشر', roleEn: 'Publishing Coordinator', avatar: '📋', color: '#6366f1' },
-    { id: 'hassan', name: 'حسن', nameEn: 'Hassan', role: 'كاتب محتوى', roleEn: 'Content Writer', avatar: '✍️', color: '#3b82f6' },
-    { id: 'reem', name: 'ريم', nameEn: 'Reem', role: 'مديرة سوشيال', roleEn: 'Social Media Manager', avatar: '📱', color: '#ec4899' },
-    { id: 'ali', name: 'علي', nameEn: 'Ali', role: 'محلل بيانات', roleEn: 'Data Analyst', avatar: '📊', color: '#14b8a6' },
-    { id: 'sara', name: 'سارة', nameEn: 'Sara', role: 'مصممة', roleEn: 'Designer', avatar: '🎨', color: '#f59e0b' },
-];
+// ─── Team (from central teamStore) ───
+export const PUB_TEAM = TEAM.filter(m =>
+    m.roles.includes('publishing_manager') || m.roles.includes('account_manager') ||
+    m.roles.includes('operations_manager') || m.roles.includes('ceo') ||
+    m.skills.includes('design')
+).map(m => ({
+    id: m.id, name: m.name, nameEn: m.nameEn,
+    role: m.position, roleEn: m.positionEn,
+    avatar: m.avatar, color: m.color,
+}));
 
 // ─── Interfaces ───
 export interface PublishingPost {
@@ -173,38 +176,57 @@ export class PublishingStore {
 
     // ── Seed ──
     private _seed() {
-        const d = (n: number) => { const dt = new Date(); dt.setDate(dt.getDate() + n); return dt.toISOString().split('T')[0]; };
-        const t = (h: number, m: number) => `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+        const now = new Date();
+        const d = (offset: number) => new Date(now.getTime() + offset * 864e5).toISOString().split('T')[0];
+        const ts = () => now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const iso = () => now.toISOString();
 
-        this.posts.push(
-            { postId: 'pub_warda_01', clientId: 'client_warda', title: 'بوست رمضان — عروض الإفطار', category: 'social_post', platform: 'Instagram', caption: '🌙 استمتعوا بعروض الإفطار الخاصة في مطعم الوردة! خصم 20% على جميع الأطباق الرمضانية.', hashtags: ['رمضان_كريم', 'الوردة', 'عروض_رمضان'], scheduledDate: d(1), scheduledTime: t(18, 0), stage: 'ready_to_publish', owner: 'ريم', assignedTeam: ['ريم', 'سارة'], linkedCreativeRequestId: 'req_w01', linkedProductionJobId: '', approved: true, blocked: false, blockReason: '', publishedUrl: '', publishedAt: '', performance: null, notes: 'نشر قبل الإفطار بساعة', createdAt: d(-3), updatedAt: d(0) },
-            { postId: 'pub_warda_02', clientId: 'client_warda', title: 'ريلز — كواليس المطبخ', category: 'reel', platform: 'Instagram', caption: '🎬 خلف الكواليس: كيف يُحضّر الشيف أطباقكم المفضلة!', hashtags: ['خلف_الكواليس', 'الوردة', 'طبخ'], scheduledDate: d(3), scheduledTime: t(20, 0), stage: 'review', owner: 'ريم', assignedTeam: ['ريم', 'حسن'], linkedCreativeRequestId: 'req_w04', linkedProductionJobId: 'pj_ram_bts', approved: false, blocked: false, blockReason: '', publishedUrl: '', publishedAt: '', performance: null, notes: '', createdAt: d(-2), updatedAt: d(0) },
-            { postId: 'pub_warda_03', clientId: 'client_warda', title: 'كاروسيل — قائمة رمضان', category: 'carousel', platform: 'Instagram', caption: '📋 تعرفوا على قائمة رمضان الجديدة! 15 طبق جديد بانتظاركم.', hashtags: ['منيو_رمضان', 'الوردة'], scheduledDate: d(0), scheduledTime: t(12, 0), stage: 'published', owner: 'ليلى', assignedTeam: ['ليلى', 'سارة'], linkedCreativeRequestId: '', linkedProductionJobId: 'pj_warda_menu', approved: true, blocked: false, blockReason: '', publishedUrl: 'https://instagram.com/p/example1', publishedAt: d(0), performance: { reach: 12500, impressions: 18200, engagement: 8.5, likes: 1540, comments: 89, shares: 210, saves: 340 }, notes: '', createdAt: d(-5), updatedAt: d(0) },
-            { postId: 'pub_warda_04', clientId: 'client_warda', title: 'ستوري — عروض اليوم', category: 'story', platform: 'Instagram', caption: '🔥 عرض اليوم فقط!', hashtags: [], scheduledDate: d(2), scheduledTime: t(17, 0), stage: 'scheduling', owner: 'ليلى', assignedTeam: ['ليلى'], linkedCreativeRequestId: '', linkedProductionJobId: '', approved: true, blocked: false, blockReason: '', publishedUrl: '', publishedAt: '', performance: null, notes: '', createdAt: d(-1), updatedAt: d(0) },
-            { postId: 'pub_rayhana_01', clientId: 'client_rayhana', title: 'إطلاق مجموعة الربيع', category: 'reel', platform: 'Instagram', caption: '✨ مجموعة الربيع 2026 — أناقة تنبض بالحياة', hashtags: ['ريحانة', 'مجوهرات', 'Spring2026'], scheduledDate: d(5), scheduledTime: t(19, 0), stage: 'content_received', owner: 'حسن', assignedTeam: ['حسن', 'ريم'], linkedCreativeRequestId: 'req_r01', linkedProductionJobId: 'pj_spring_hero', approved: false, blocked: true, blockReason: 'بانتظار اكتمال الفيديو من الإنتاج', publishedUrl: '', publishedAt: '', performance: null, notes: 'مرتبط بحملة الربيع', createdAt: d(-1), updatedAt: d(0) },
-            { postId: 'pub_rayhana_02', clientId: 'client_rayhana', title: 'بوست — خاتم الياقوت', category: 'social_post', platform: 'Instagram', caption: '💎 خاتم الياقوت الطبيعي — قطعة فريدة بتصميم كلاسيكي.', hashtags: ['ريحانة', 'ياقوت', 'مجوهرات_فاخرة'], scheduledDate: d(-1), scheduledTime: t(20, 0), stage: 'published', owner: 'ريم', assignedTeam: ['ريم', 'سارة'], linkedCreativeRequestId: 'req_r02', linkedProductionJobId: '', approved: true, blocked: false, blockReason: '', publishedUrl: 'https://instagram.com/p/example2', publishedAt: d(-1), performance: { reach: 8900, impressions: 14300, engagement: 6.2, likes: 880, comments: 45, shares: 120, saves: 195 }, notes: '', createdAt: d(-4), updatedAt: d(-1) },
-            { postId: 'pub_warda_05', clientId: 'client_warda', title: 'إعلان مدفوع — رمضان', category: 'ad', platform: 'Facebook', caption: '🌙 احجز طاولة الإفطار الآن! مطعم الوردة ينتظركم.', hashtags: ['رمضان', 'إفطار', 'حجز'], scheduledDate: d(4), scheduledTime: t(16, 0), stage: 'design_check', owner: 'سارة', assignedTeam: ['سارة', 'علي'], linkedCreativeRequestId: '', linkedProductionJobId: '', approved: false, blocked: false, blockReason: '', publishedUrl: '', publishedAt: '', performance: null, notes: 'ميزانية إعلان: 500$', createdAt: d(-1), updatedAt: d(0) },
-            { postId: 'pub_warda_06', clientId: 'client_warda', title: 'نشرة بريدية — عروض الأسبوع', category: 'newsletter', platform: 'Email', caption: 'عروض الأسبوع الحصرية لمشتركي الوردة!', hashtags: [], scheduledDate: d(6), scheduledTime: t(10, 0), stage: 'content_received', owner: 'حسن', assignedTeam: ['حسن'], linkedCreativeRequestId: '', linkedProductionJobId: '', approved: false, blocked: false, blockReason: '', publishedUrl: '', publishedAt: '', performance: null, notes: '', createdAt: d(0), updatedAt: d(0) },
-        );
-        // Calendar Events
-        this.calendarEvents.push(
-            { id: 'pce1', clientId: 'client_warda', postId: 'pub_warda_01', title: 'بوست عروض الإفطار', date: d(1), platform: 'Instagram', color: '#ec4899' },
-            { id: 'pce2', clientId: 'client_warda', postId: 'pub_warda_02', title: 'ريلز كواليس المطبخ', date: d(3), platform: 'Instagram', color: '#8b5cf6' },
-            { id: 'pce3', clientId: 'client_warda', postId: 'pub_warda_03', title: 'كاروسيل قائمة رمضان', date: d(0), platform: 'Instagram', color: '#22c55e' },
-            { id: 'pce4', clientId: 'client_warda', postId: 'pub_warda_04', title: 'ستوري عروض اليوم', date: d(2), platform: 'Instagram', color: '#f59e0b' },
-            { id: 'pce5', clientId: 'client_rayhana', postId: 'pub_rayhana_01', title: 'إطلاق مجموعة الربيع', date: d(5), platform: 'Instagram', color: '#6366f1' },
-            { id: 'pce6', clientId: 'client_warda', postId: 'pub_warda_05', title: 'إعلان رمضان — Facebook', date: d(4), platform: 'Facebook', color: '#3b82f6' },
-            { id: 'pce7', clientId: 'client_warda', postId: 'pub_warda_06', title: 'نشرة بريدية', date: d(6), platform: 'Email', color: '#14b8a6' },
-        );
-        // Activities
-        this.activities.push(
-            { id: 'pba1', clientId: 'client_warda', postId: 'pub_warda_03', text: '✅ تم نشر كاروسيل قائمة رمضان', textEn: '✅ Ramadan menu carousel published', icon: '✅', time: '12:00', type: 'success' },
-            { id: 'pba2', clientId: 'client_rayhana', postId: 'pub_rayhana_02', text: '✅ تم نشر بوست خاتم الياقوت', textEn: '✅ Ruby ring post published', icon: '✅', time: '20:00', type: 'success' },
-            { id: 'pba3', clientId: 'client_warda', postId: 'pub_warda_01', text: '📋 بوست عروض الإفطار — جاهز للنشر', textEn: '📋 Iftar deals post — ready to publish', icon: '📋', time: '15:30', type: 'info' },
-            { id: 'pba4', clientId: 'client_rayhana', postId: 'pub_rayhana_01', text: '⛔ إطلاق الربيع — محظور (بانتظار الفيديو)', textEn: '⛔ Spring launch — blocked (awaiting video)', icon: '⛔', time: '11:00', type: 'warning' },
-            { id: 'pba5', clientId: 'client_warda', postId: 'pub_warda_05', text: '🔍 إعلان رمضان — فحص التصميم', textEn: '🔍 Ramadan ad — design check', icon: '🔍', time: '14:00', type: 'info' },
-            { id: 'pba6', clientId: 'client_warda', postId: 'pub_warda_06', text: '🆕 نشرة بريدية جديدة — عروض الأسبوع', textEn: '🆕 New newsletter — weekly deals', icon: '🆕', time: '09:30', type: 'success' },
-        );
+        const mkPost = (id: string, cId: string, title: string, cat: PostCategory, platform: string, stage: PubStage, sDate: string, sTime: string, owner: string, extra?: Partial<PublishingPost>): PublishingPost => ({
+            postId: id, clientId: cId, title, category: cat, platform, caption: `محتوى ${title}`, hashtags: ['remark', 'iraq'],
+            scheduledDate: sDate, scheduledTime: sTime, stage, owner, assignedTeam: [owner],
+            linkedCreativeRequestId: '', linkedProductionJobId: '',
+            approved: ['ready_to_publish', 'published', 'performance_review'].includes(stage),
+            blocked: false, blockReason: '', publishedUrl: stage === 'published' || stage === 'performance_review' ? `https://instagram.com/p/${id}` : '',
+            publishedAt: stage === 'published' || stage === 'performance_review' ? iso() : '',
+            performance: stage === 'performance_review' ? { reach: Math.floor(Math.random() * 50000) + 5000, impressions: Math.floor(Math.random() * 80000) + 10000, engagement: Math.floor(Math.random() * 8) + 2, likes: Math.floor(Math.random() * 3000) + 200, comments: Math.floor(Math.random() * 150) + 10, shares: Math.floor(Math.random() * 100) + 5, saves: Math.floor(Math.random() * 200) + 20 } : null,
+            notes: '', createdAt: iso(), updatedAt: iso(), ...extra,
+        });
+
+        this.posts = [
+            // الوردة
+            mkPost('pub_w1', 'client_warda', 'بوست عرض الغداء الخاص', 'social_post', 'Instagram', 'ready_to_publish', d(0), '12:00', 'زين العابدين', { caption: '🍽️ عرض الغداء الخاص — خصم 20% على جميع الأطباق الرئيسية! الحق العرض قبل نهاية الأسبوع', hashtags: ['الوردة', 'عرض_الغداء', 'بغداد', 'مطاعم'] }),
+            mkPost('pub_w2', 'client_warda', 'ستوري — كواليس المطبخ', 'story', 'Instagram', 'scheduling', d(1), '18:00', 'زين العابدين'),
+            mkPost('pub_w3', 'client_warda', 'ريلز المطبخ — وصفة اليوم', 'reel', 'Instagram', 'review', d(2), '20:00', 'زين العابدين', { linkedProductionJobId: 'pj_w1' }),
+            mkPost('pub_w4', 'client_warda', 'بوست فبراير — عروض الشتاء', 'social_post', 'Instagram', 'published', d(-10), '12:00', 'زين العابدين'),
+            mkPost('pub_w5', 'client_warda', 'ريلز ترويجي فبراير', 'reel', 'TikTok', 'performance_review', d(-8), '19:00', 'زين العابدين', { linkedProductionJobId: 'pj_d1' }),
+            // ريحانة
+            mkPost('pub_r1', 'client_rayhana', 'بوست مشروع حياة — تحديث', 'social_post', 'Instagram', 'design_check', d(3), '10:00', 'وديان', { caption: '🏠 مشروع حياة — تحديثات البناء للمرحلة الثانية. موعد التسليم: Q3 2026', hashtags: ['ريحانة', 'مشروع_حياة', 'عقارات_العراق'] }),
+            mkPost('pub_r2', 'client_rayhana', 'إعلان ممول — شقق للبيع', 'ad', 'Facebook', 'content_received', d(5), '09:00', 'وديان'),
+            mkPost('pub_r3', 'client_rayhana', 'كاروسيل — مزايا المشروع', 'carousel', 'Instagram', 'published', d(-5), '11:00', 'وديان'),
+            // كلفنك
+            mkPost('pub_k1', 'client_kalfink', 'بوست منتج العناية الجديد', 'social_post', 'Instagram', 'ready_to_publish', d(1), '15:00', 'زين العابدين', { linkedCreativeRequestId: 'req_k1', caption: '💄 منتج جديد! كريم العناية بالبشرة — تركيبة طبيعية 100%', hashtags: ['كلفنك', 'عناية_بالبشرة', 'جمال'] }),
+            mkPost('pub_k2', 'client_kalfink', 'ستوري — خطوات الاستخدام', 'story', 'Instagram', 'scheduling', d(2), '17:00', 'زين العابدين'),
+            mkPost('pub_k3', 'client_kalfink', 'ريلز — قبل وبعد', 'reel', 'TikTok', 'performance_review', d(-12), '20:00', 'زين العابدين'),
+            // زمزم
+            mkPost('pub_z1', 'client_zamzam', 'بوست إطلاق مشروع النور', 'social_post', 'Instagram', 'content_received', d(7), '10:00', 'وديان', { caption: '🏗️ مشروع النور — إطلاق المرحلة الأولى قريباً! سجّل اهتمامك الآن', hashtags: ['زمزم', 'مشروع_النور', 'استثمار_عقاري'] }),
+            mkPost('pub_z2', 'client_zamzam', 'فيديو تحديث أعمال البناء', 'reel', 'YouTube', 'content_received', d(10), '12:00', 'وديان'),
+        ];
+
+        this.calendarEvents = this.posts.filter(p => p.scheduledDate).map(p => ({
+            id: `pce_${p.postId}`, clientId: p.clientId, postId: p.postId,
+            title: p.title, date: p.scheduledDate, platform: p.platform,
+            color: PUB_STAGE_META[p.stage].color,
+        }));
+
+        this.activities = [
+            { id: 'pba1', clientId: 'client_warda', postId: 'pub_w1', text: '📢 بوست عرض الغداء — جاهز للنشر', textEn: '📢 Lunch Offer Post — Ready to publish', icon: '📢', time: ts(), type: 'success' },
+            { id: 'pba2', clientId: 'client_warda', postId: 'pub_w5', text: '📊 ريلز فبراير — مراجعة الأداء', textEn: '📊 Feb Reel — Performance review', icon: '📊', time: ts(), type: 'info' },
+            { id: 'pba3', clientId: 'client_rayhana', postId: 'pub_r1', text: '🎨 بوست مشروع حياة — فحص التصميم', textEn: '🎨 Hayat Post — Design check', icon: '🎨', time: ts(), type: 'info' },
+            { id: 'pba4', clientId: 'client_kalfink', postId: 'pub_k1', text: '✅ بوست العناية — جاهز للنشر', textEn: '✅ Skincare Post — Ready to publish', icon: '✅', time: ts(), type: 'success' },
+            { id: 'pba5', clientId: 'client_zamzam', postId: 'pub_z1', text: '🆕 بوست إطلاق مشروع النور — مستلم', textEn: '🆕 Noor Launch Post — Received', icon: '🆕', time: ts(), type: 'info' },
+        ];
+
+        this._saveToStorage();
     }
 }
 

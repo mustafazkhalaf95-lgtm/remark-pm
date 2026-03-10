@@ -5,6 +5,7 @@ import Link from 'next/link';
 import s from './page.module.css';
 import { getProductionStore, PROD_STAGES, PROD_STAGE_META, JOB_CAT_AR, JOB_CAT_EN, JOB_CAT_ICON, PROD_TEAM, type ProdStage } from '@/lib/productionStore';
 import { getCreativeStore } from '@/lib/creativeStore';
+import { useSettings } from '@/lib/useSettings';
 
 export default function ClientProductionWorkspace() {
     const params = useParams();
@@ -14,12 +15,10 @@ export default function ClientProductionWorkspace() {
     const ver = useSyncExternalStore(cb => store.subscribe(cb), () => store.getVersion(), () => 0);
     useSyncExternalStore(cb => cStore.subscribe(cb), () => cStore.getVersion(), () => 0);
 
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [lang, setLang] = useState<'ar' | 'en'>('ar');
+    const { theme, lang, toggleTheme, toggleLang } = useSettings();
     const [tab, setTab] = useState('overview');
     const [toast, setToast] = useState('');
 
-    useEffect(() => { theme === 'dark' ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark'); }, [theme]);
     useEffect(() => { const t = store.getToast(); if (t.msg) { setToast(t.msg); setTimeout(() => setToast(''), 3000); } }, [ver, store]);
 
     const ar = lang === 'ar';
@@ -58,8 +57,8 @@ export default function ClientProductionWorkspace() {
                 </div>
                 <div className={s.headerLeft}>
                     <Link href="/production" className={s.backBtn}>← {ar ? 'العودة' : 'Back'}</Link>
-                    <button className={s.iconBtn} onClick={() => setTheme(p => p === 'light' ? 'dark' : 'light')}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg></button>
-                    <button className={s.iconBtn} onClick={() => setLang(p => p === 'ar' ? 'en' : 'ar')}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></button>
+                    <button className={s.iconBtn} onClick={toggleTheme}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg></button>
+                    <button className={s.iconBtn} onClick={toggleLang}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></button>
                     <div className={s.headerDivider} />
                     <div className={s.navSwitcher}>
                         <Link href="/" className={s.navInactive}>📋 {ar ? 'التسويق' : 'Marketing'}</Link>

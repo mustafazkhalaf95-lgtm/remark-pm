@@ -5,6 +5,7 @@ import Link from 'next/link';
 import s from '../../page.module.css';
 import { getProductionStore, PROD_STAGES, PROD_STAGE_META, JOB_CAT_AR, JOB_CAT_EN, JOB_CAT_ICON, PROD_TEAM } from '@/lib/productionStore';
 import { getCreativeStore } from '@/lib/creativeStore';
+import { useSettings } from '@/lib/useSettings';
 
 export default function CampaignWorkspace() {
     const params = useParams();
@@ -14,15 +15,13 @@ export default function CampaignWorkspace() {
     const ver = useSyncExternalStore(cb => store.subscribe(cb), () => store.getVersion(), () => 0);
     useSyncExternalStore(cb => cStore.subscribe(cb), () => cStore.getVersion(), () => 0);
 
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [lang, setLang] = useState<'ar' | 'en'>('ar');
+    const { theme, lang, toggleTheme, toggleLang } = useSettings();
     const [toast, setToast] = useState('');
     const [showStoryboard, setShowStoryboard] = useState<string | null>(null);
     const [selectedJob, setSelectedJob] = useState<string | null>(null);
     const [uploadName, setUploadName] = useState('');
     const [versionLabel, setVersionLabel] = useState('');
 
-    useEffect(() => { theme === 'dark' ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark'); }, [theme]);
     useEffect(() => { const t = store.getToast(); if (t.msg) { setToast(t.msg); setTimeout(() => setToast(''), 3000); } }, [ver, store]);
 
     const ar = lang === 'ar';
@@ -49,8 +48,8 @@ export default function CampaignWorkspace() {
                 <div className={s.headerLeft}>
                     <Link href="/production" style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'var(--bg-glass-50)', border: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>← {ar ? 'مقر الإنتاج' : 'Production HQ'}</Link>
                     <Link href={`/production/client/${camp.clientId}`} style={{ padding: '6px 14px', borderRadius: 8, fontSize: 13, fontWeight: 600, background: 'var(--bg-glass-50)', border: '1px solid var(--border)', textDecoration: 'none', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 4 }}>👤 {cn(camp.clientId)}</Link>
-                    <button className={s.iconBtn} onClick={() => setTheme(p => p === 'light' ? 'dark' : 'light')}>🌙</button>
-                    <button className={s.iconBtn} onClick={() => setLang(p => p === 'ar' ? 'en' : 'ar')}>🌐</button>
+                    <button className={s.iconBtn} onClick={toggleTheme}>🌙</button>
+                    <button className={s.iconBtn} onClick={toggleLang}>🌐</button>
                     <div className={s.userAvatar}>م.خ</div>
                 </div>
             </header>

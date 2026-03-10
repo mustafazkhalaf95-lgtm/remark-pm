@@ -1,34 +1,57 @@
+/* ══════════════════════════════════════════════════════════
+   Remark PM — Admin SQL Route (Hardened)
+   Safe schema info and read-only queries for CEO/COO only.
+   ══════════════════════════════════════════════════════════ */
+
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { requireRole, logAudit } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 
-// ─── Allowed table names (whitelist to prevent SQL injection) ───
+// ─── Allowed table names (whitelist — updated to match current schema) ───
 const ALLOWED_TABLES = [
-    'User', 'Workspace', 'WorkspaceMember', 'Board', 'List', 'Card',
-    'CardAssignee', 'CardMirror', 'TaskPhase', 'Label', 'CardLabel',
-    'CustomField', 'CardFieldValue', 'Brief', 'Comment', 'Attachment',
-    'ActivityLog', 'Notification', 'AutomationRule', 'Channel',
-    'ChannelMember', 'ChatMessage', 'Mention',
+    'Organization', 'Department', 'DepartmentSetting', 'SystemSetting', 'IntegrationSetting',
+    'User', 'UserProfile', 'Position', 'Role', 'Permission', 'RolePermission',
+    'UserRole', 'UserDepartment', 'UserClient',
+    'ApprovalAuthority', 'ApprovalPolicy',
+    'Client', 'Campaign', 'MarketingTask', 'CreativeRequest', 'ProductionJob', 'PublishingItem',
+    'Asset', 'Comment', 'Approval', 'Notification', 'ActivityLog', 'AuditLog',
 ];
 
 function isValidTableName(name: string): boolean {
-    return ALLOWED_TABLES.some(t => t.toLowerCase() === name.toLowerCase());
+    return ALLOWED_TABLES.some((t) => t.toLowerCase() === name.toLowerCase());
 }
 
 function sanitizeIdentifier(name: string): string {
-    // Only allow alphanumeric and underscore characters
     return name.replace(/[^a-zA-Z0-9_]/g, '');
+}
+
+// ─── Rate Limiting (simple in-memory) ───
+const queryLog = new Map<string, { count: number; windowStart: number }>();
+const RATE_LIMIT = 10;
+const RATE_WINDOW = 60_000;
+
+function checkRateLimit(userId: string): boolean {
+    const now = Date.now();
+    const entry = queryLog.get(userId);
+    if (!entry || now - entry.windowStart > RATE_WINDOW) {
+        queryLog.set(userId, { count: 1, windowStart: now });
+        return true;
+    }
+    if (entry.count >= RATE_LIMIT) return false;
+    entry.count++;
+    return true;
 }
 
 // GET /api/admin/sql — Safe schema info queries only
 export async function GET(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireRole(['CEO', 'COO']);
+    if (auth.error) return auth.error;
 
-    const userRole = (session.user as any).role;
-    if (userRole !== 'CEO' && userRole !== 'COO') {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!checkRateLimit(auth.session.user.id)) {
+        return NextResponse.json(
+            { error: 'طلبات كثيرة — حاول بعد دقيقة', error_en: 'Rate limit exceeded' },
+            { status: 429 }
+        );
     }
 
     try {
@@ -45,13 +68,10 @@ export async function GET(request: Request) {
         if (action === 'schema') {
             const table = searchParams.get('table');
             if (!table) return NextResponse.json({ error: 'table param required' }, { status: 400 });
-
-            // Validate table name against whitelist
             if (!isValidTableName(table)) {
                 return NextResponse.json({ error: 'Invalid table name' }, { status: 400 });
             }
             const safeTable = sanitizeIdentifier(table);
-
             const columns: any[] = await prisma.$queryRawUnsafe(`PRAGMA table_info("${safeTable}")`);
             const count: any[] = await prisma.$queryRawUnsafe(`SELECT COUNT(*) as count FROM "${safeTable}"`);
             return NextResponse.json({ table: safeTable, columns, rowCount: count[0]?.count || 0 });
@@ -78,14 +98,16 @@ export async function GET(request: Request) {
     }
 }
 
-// POST /api/admin/sql — Safe read-only queries with whitelist validation
+// POST /api/admin/sql — Safe read-only queries with hardened validation
 export async function POST(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const auth = await requireRole(['CEO', 'COO']);
+    if (auth.error) return auth.error;
 
-    const userRole = (session.user as any).role;
-    if (userRole !== 'CEO' && userRole !== 'COO') {
-        return NextResponse.json({ error: 'Only CEO/COO can access SQL admin' }, { status: 403 });
+    if (!checkRateLimit(auth.session.user.id)) {
+        return NextResponse.json(
+            { error: 'طلبات كثيرة — حاول بعد دقيقة', error_en: 'Rate limit exceeded' },
+            { status: 429 }
+        );
     }
 
     try {
@@ -97,26 +119,33 @@ export async function POST(request: Request) {
         const trimmed = query.trim();
         const upper = trimmed.toUpperCase();
 
-        // ─── SECURITY: Only allow SELECT and PRAGMA queries ───
+        // SECURITY: Only allow SELECT and PRAGMA queries
         if (!upper.startsWith('SELECT') && !upper.startsWith('PRAGMA')) {
             return NextResponse.json(
-                { error: 'Only SELECT and PRAGMA queries are allowed. Use the application UI for data modifications.' },
+                { error: 'Only SELECT and PRAGMA queries are allowed.' },
                 { status: 403 }
             );
         }
 
-        // ─── SECURITY: Block dangerous patterns ───
+        // SECURITY: Block dangerous patterns (including backticks)
         const dangerousPatterns = [
             /;\s*(DROP|DELETE|INSERT|UPDATE|ALTER|CREATE|TRUNCATE|EXEC|EXECUTE)/i,
             /UNION\s+ALL\s+SELECT/i,
             /INTO\s+OUTFILE/i,
             /LOAD_FILE/i,
-            /--\s/,        // SQL comment injection
-            /\/\*.*\*\//,  // Block comment injection
+            /--\s/,
+            /\/\*.*\*\//,
+            /`/,
+            /ATTACH\s+DATABASE/i,
+            /DETACH\s+DATABASE/i,
         ];
 
         for (const pattern of dangerousPatterns) {
             if (pattern.test(trimmed)) {
+                await logAudit(auth.session.user.id, 'blocked_sql_query', 'security', {
+                    query: trimmed.substring(0, 200),
+                    reason: 'Dangerous pattern detected',
+                });
                 return NextResponse.json(
                     { error: 'Query contains forbidden patterns' },
                     { status: 403 }
@@ -124,14 +153,24 @@ export async function POST(request: Request) {
             }
         }
 
-        // ─── SECURITY: Limit query length ───
+        // SECURITY: Limit query length
         if (trimmed.length > 2000) {
             return NextResponse.json({ error: 'Query too long (max 2000 characters)' }, { status: 400 });
         }
 
+        // Log the query for audit trail
+        await logAudit(auth.session.user.id, 'sql_query', 'admin', {
+            query: trimmed.substring(0, 500),
+        });
+
+        // Execute query
         const result = await prisma.$queryRawUnsafe(trimmed);
+
         // Handle BigInt serialization
-        const serialized = JSON.parse(JSON.stringify(result, (_, v) => typeof v === 'bigint' ? Number(v) : v));
+        const serialized = JSON.parse(
+            JSON.stringify(result, (_, v) => (typeof v === 'bigint' ? Number(v) : v))
+        );
+
         return NextResponse.json({
             success: true,
             type: 'query',

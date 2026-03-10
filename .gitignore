@@ -60,3 +60,5 @@ test-*.js
 # Gemini/Antigravity
 .gemini/
 .agents/
+dev.db
+dev.db-journal

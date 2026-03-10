@@ -1,340 +1,179 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useSession } from 'next-auth/react';
-import AppLayout from '@/components/AppLayout';
-import GlassCard from '@/components/GlassCard';
-
-interface Member { user: { id: string; name: string; avatar?: string } }
-interface Message { id: string; content: string; createdAt: string; user: { id: string; name: string; avatar?: string; role: string }; mentions: any[] }
-interface Channel { id: string; name: string; description?: string; channelType: string; members: Member[]; messages: Message[]; unreadCount: number; _count: { messages: number; members: number } }
-interface UserResult { id: string; name: string; role: string }
-
-const ROLE_COLORS: Record<string, string> = { CEO: '#6366f1', COO: '#8b5cf6', CREATIVE_MANAGER: '#06b6d4', PRODUCTION_MANAGER: '#f59e0b', MARKETING: '#22c55e', DESIGNER: '#a855f7', COPYWRITER: '#ec4899', ACCOUNT_MANAGER: '#f97316', MEMBER: '#64748b' };
+import { useState, useEffect, useRef, useSyncExternalStore } from 'react';
+import Link from 'next/link';
+import { TEAM, type TeamMember } from '@/lib/teamStore';
+import { useSettings } from '@/lib/useSettings';
+import { getChatStore, type ChatRoom, type ChatMessage } from '@/lib/chatStore';
+import { getCreativeStore } from '@/lib/creativeStore';
 
 export default function ChatPage() {
-    const { data: session } = useSession();
-    const [channels, setChannels] = useState<Channel[]>([]);
-    const [activeChannel, setActiveChannel] = useState<string | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const chat = getChatStore();
+    const cs = getCreativeStore();
+    const chatV = useSyncExternalStore(cb => chat.subscribe(cb), () => chat.getVersion(), () => 0);
+    const { theme, lang, user, toggleTheme, toggleLang } = useSettings();
+    const [activeRoom, setActiveRoom] = useState('room_company');
     const [input, setInput] = useState('');
-    const [loading, setLoading] = useState(true);
-    const [showNewChannel, setShowNewChannel] = useState(false);
-    const [newChannelName, setNewChannelName] = useState('');
-    const [mentionSearch, setMentionSearch] = useState<string | null>(null);
-    const [mentionResults, setMentionResults] = useState<UserResult[]>([]);
-    const [mentionIndex, setMentionIndex] = useState(0);
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
-    const pollRef = useRef<any>(null);
+    const [showMentions, setShowMentions] = useState(false);
+    const [mentionFilter, setMentionFilter] = useState('');
+    const msgsRef = useRef<HTMLDivElement>(null);
 
-    const fetchChannels = useCallback(async () => {
-        const res = await fetch('/api/channels');
-        if (res.ok) {
-            const data = await res.json();
-            setChannels(data);
-            if (!activeChannel && data.length > 0) setActiveChannel(data[0].id);
-        }
-        setLoading(false);
-    }, [activeChannel]);
+    useEffect(() => { msgsRef.current?.scrollTo(0, msgsRef.current.scrollHeight); }, [chatV, activeRoom]);
 
-    const fetchMessages = useCallback(async () => {
-        if (!activeChannel) return;
-        const res = await fetch(`/api/channels/${activeChannel}/messages`);
-        if (res.ok) setMessages(await res.json());
-    }, [activeChannel]);
+    const rooms = chat.getRoomsForMember(user.id);
+    const room = chat.getRoom(activeRoom);
+    const msgs = chat.getRoomMessages(activeRoom);
+    const unreadTotal = chat.getUnreadCount(user.id);
 
-    useEffect(() => { fetchChannels(); }, [fetchChannels]);
-    useEffect(() => { if (activeChannel) { fetchMessages(); } }, [activeChannel, fetchMessages]);
-
-    // Polling for new messages every 3 seconds
-    useEffect(() => {
-        if (activeChannel) {
-            pollRef.current = setInterval(fetchMessages, 3000);
-            return () => clearInterval(pollRef.current);
-        }
-    }, [activeChannel, fetchMessages]);
-
-    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
-
-    // @mention search
-    useEffect(() => {
-        if (mentionSearch !== null) {
-            fetch(`/api/search/users?q=${mentionSearch}`).then(r => r.json()).then(data => setMentionResults(data));
-        } else {
-            setMentionResults([]);
-        }
-    }, [mentionSearch]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const val = e.target.value;
-        setInput(val);
-        // Check for @mention trigger
-        const lastAtIndex = val.lastIndexOf('@');
-        if (lastAtIndex >= 0 && (lastAtIndex === 0 || val[lastAtIndex - 1] === ' ')) {
-            const query = val.substring(lastAtIndex + 1);
-            if (!query.includes(' ')) { setMentionSearch(query); setMentionIndex(0); return; }
-        }
-        setMentionSearch(null);
+    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value; setInput(val);
+        const last = val.split(' ').pop() || '';
+        if (last.startsWith('@') && last.length > 1) { setShowMentions(true); setMentionFilter(last.slice(1)); }
+        else setShowMentions(false);
     };
 
-    const insertMention = (user: UserResult) => {
-        const lastAtIndex = input.lastIndexOf('@');
-        const before = input.substring(0, lastAtIndex);
-        const firstName = user.name.split(' ')[0].split('(')[0].trim();
-        setInput(`${before}@${firstName} `);
-        setMentionSearch(null);
-        inputRef.current?.focus();
+    const insertMention = (m: TeamMember) => {
+        const words = input.split(' '); words.pop();
+        setInput(words.join(' ') + (words.length ? ' ' : '') + `@${m.name} `);
+        setShowMentions(false);
     };
 
-    const sendMessage = async () => {
-        if (!input.trim() || !activeChannel) return;
-        const content = input.trim();
+    const send = () => {
+        if (!input.trim()) return;
+        chat.sendMessage(activeRoom, input, user.id);
+        // AI auto-response in production room
+        if (activeRoom === 'room_production' && room?.aiEnabled) {
+            setTimeout(() => {
+                const txt = input.toLowerCase();
+                if (txt.includes('تعيين') || txt.includes('assign')) {
+                    chat.sendAIMessage(activeRoom, lang === 'ar' ? '🤖 هل تريدني أن أقوم بتعيين هذه المهمة؟ سأحتاج موافقتك أولاً.' : '🤖 Should I assign this task? I need your permission first.', {
+                        description: lang === 'ar' ? 'تعيين المهمة المذكورة' : 'Assign the mentioned task',
+                        descriptionEn: 'Assign the mentioned task',
+                        targetType: 'assignment', targetId: '', proposedChange: input, proposedBy: 'ai',
+                    });
+                } else if (txt.includes('نقل') || txt.includes('move') || txt.includes('حرك')) {
+                    chat.sendAIMessage(activeRoom, lang === 'ar' ? '🤖 هل تريدني أن أنقل هذه البطاقة للمرحلة التالية؟' : '🤖 Should I move this card to the next stage?', {
+                        description: lang === 'ar' ? 'نقل البطاقة للمرحلة التالية' : 'Move card to next stage',
+                        descriptionEn: 'Move card to next stage',
+                        targetType: 'status', targetId: '', proposedChange: 'next_stage', proposedBy: 'ai',
+                    });
+                } else {
+                    chat.sendAIMessage(activeRoom, lang === 'ar' ? '👍 تم الاطلاع. إذا احتجت مساعدة في تغيير أي بطاقة أو تعيين مهمة، أخبرني.' : '👍 Noted. If you need help changing any card or assigning a task, let me know.');
+                }
+            }, 1500);
+        }
         setInput('');
+    };
 
-        const res = await fetch(`/api/channels/${activeChannel}/messages`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content }),
-        });
-        if (res.ok) {
-            const msg = await res.json();
-            setMessages(prev => [...prev, msg]);
+    const filteredMentions = TEAM.filter(m => m.name.includes(mentionFilter) || m.nameEn.toLowerCase().includes(mentionFilter.toLowerCase()));
+
+    const renderMessage = (m: ChatMessage) => {
+        // Render mentions as highlighted
+        let text = m.text;
+        for (const mid of m.mentions) {
+            const mem = TEAM.find(t => t.id === mid);
+            if (mem) { text = text.replace(`@${mem.name}`, `【${mem.avatar} ${mem.name}】`).replace(`@${mem.nameEn}`, `【${mem.avatar} ${mem.nameEn}】`); }
         }
-    };
-
-    const createChannel = async () => {
-        if (!newChannelName.trim()) return;
-        const res = await fetch('/api/channels', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: newChannelName }),
-        });
-        if (res.ok) {
-            const ch = await res.json();
-            setChannels(prev => [ch, ...prev]);
-            setActiveChannel(ch.id);
-            setShowNewChannel(false);
-            setNewChannelName('');
-        }
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-        if (mentionSearch !== null && mentionResults.length > 0) {
-            if (e.key === 'ArrowDown') { e.preventDefault(); setMentionIndex(i => Math.min(i + 1, mentionResults.length - 1)); }
-            else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionIndex(i => Math.max(i - 1, 0)); }
-            else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionResults[mentionIndex]); }
-            else if (e.key === 'Escape') { setMentionSearch(null); }
-            return;
-        }
-        if (e.key === 'Enter') sendMessage();
-    };
-
-    const escapeHtml = (text: string) => {
-        return text
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    };
-
-    const formatMessageContent = (content: string) => {
-        const escaped = escapeHtml(content);
-        return escaped.replace(/@(\w+)/g, '<span class="text-violet-400 font-bold bg-violet-500/10 px-1 rounded">@$1</span>');
-    };
-
-    const formatTime = (date: string) => {
-        const d = new Date(date);
-        return d.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
-    };
-
-    const activeChannelData = channels.find(c => c.id === activeChannel);
-    const userId = (session?.user as any)?.id;
-
-    if (loading) {
         return (
-            <AppLayout>
-                <div className="flex justify-center items-center h-full">
-                    <div className="w-10 h-10 rounded-full border-t-2 border-r-2 border-violet-500 animate-spin" />
+            <div key={m.messageId} style={{ display: 'flex', gap: 8, padding: '8px 12px', borderRadius: 10, background: m.type === 'ai' ? 'rgba(20,184,166,.04)' : m.type === 'system' ? 'rgba(99,102,241,.03)' : 'transparent', border: m.type === 'ai' ? '1px solid rgba(20,184,166,.1)' : m.type === 'system' ? '1px solid rgba(99,102,241,.08)' : 'none', marginBottom: 4 }}>
+                <div style={{ fontSize: 18, flexShrink: 0 }}>{m.senderAvatar}</div>
+                <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text, #1e293b)' }}>{m.senderName} <span style={{ fontWeight: 400, color: 'var(--text-muted, #64748b)', marginInlineStart: 4, fontSize: 9 }}>{new Date(m.timestamp).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span></div>
+                    <div style={{ fontSize: 12, color: 'var(--text, #1e293b)', lineHeight: 1.6, marginTop: 2 }}>{text}</div>
+                    {/* AI Action */}
+                    {m.aiAction && m.aiAction.status === 'proposed' && (
+                        <div style={{ background: 'rgba(20,184,166,.06)', border: '1px solid rgba(20,184,166,.15)', borderRadius: 8, padding: '8px 12px', marginTop: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 600, marginBottom: 6 }}>🤖 {m.aiAction.description}</div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                                <button style={{ fontSize: 10, padding: '4px 14px', borderRadius: 6, border: 'none', background: '#22c55e', color: '#fff', fontWeight: 700, cursor: 'pointer' }} onClick={() => { chat.approveAIAction(m.aiAction!.actionId, user.id); chat.executeAIAction(m.aiAction!.actionId); chat.sendSystemMessage(activeRoom, `✅ ${user.name} وافق على: ${m.aiAction!.description}`); }}>✅ {lang === 'ar' ? 'موافق' : 'Approve'}</button>
+                                <button style={{ fontSize: 10, padding: '4px 14px', borderRadius: 6, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, cursor: 'pointer' }} onClick={() => { chat.rejectAIAction(m.aiAction!.actionId, user.id); chat.sendSystemMessage(activeRoom, `❌ ${user.name} رفض: ${m.aiAction!.description}`); }}>❌ {lang === 'ar' ? 'رفض' : 'Reject'}</button>
+                            </div>
+                        </div>
+                    )}
+                    {m.aiAction && m.aiAction.status !== 'proposed' && (
+                        <div style={{ fontSize: 10, color: m.aiAction.status === 'approved' || m.aiAction.status === 'executed' ? '#22c55e' : '#ef4444', marginTop: 4 }}>
+                            {m.aiAction.status === 'executed' ? '✅ تم التنفيذ' : m.aiAction.status === 'approved' ? '✅ تمت الموافقة' : '❌ مرفوض'}
+                        </div>
+                    )}
+                    {/* Card previews */}
+                    {m.cardRefs.map((cr, i) => (
+                        <div key={i} style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--border, rgba(0,0,0,.1))', borderRadius: 8, padding: '8px 12px', marginTop: 4, cursor: 'pointer' }}>
+                            <div style={{ fontSize: 12, fontWeight: 700 }}>{cr.title}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted, #64748b)', display: 'flex', gap: 8, marginTop: 2 }}>
+                                <span>{cr.clientName}</span><span>{cr.status}</span><span>{cr.assignee}</span>{cr.dueDate && <span>📅 {cr.dueDate}</span>}
+                            </div>
+                        </div>
+                    ))}
                 </div>
-            </AppLayout>
+            </div>
         );
-    }
+    };
 
     return (
-        <AppLayout>
-            {/* Topbar */}
-            <div className="flex items-center justify-between p-6 pb-2 relative z-10">
-                <h1 className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-white/60">💬 المحادثات</h1>
-            </div>
+        <div style={{ minHeight: '100vh', background: 'var(--bg-main, #f1f5f9)', fontFamily: "'Noto Sans Arabic','Inter',system-ui,sans-serif" }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            {/* Header */}
+            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 24px', background: 'var(--card-bg, #fff)', borderBottom: '1px solid var(--border, rgba(0,0,0,.08))' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>R</div>
+                    <span style={{ fontSize: 16, fontWeight: 800 }}>💬 {lang === 'ar' ? 'المحادثات' : 'Chat'}</span>
+                </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <Link href="/workspace" style={{ fontSize: 11, color: '#6366f1', textDecoration: 'none', fontWeight: 600 }}>← {lang === 'ar' ? 'المساحة' : 'Workspace'}</Link>
+                    <button onClick={toggleTheme} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border, rgba(0,0,0,.08))', background: 'var(--card-bg, #fff)', cursor: 'pointer', fontSize: 14 }}>🌙</button>
+                    <button onClick={toggleLang} style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border, rgba(0,0,0,.08))', background: 'var(--card-bg, #fff)', cursor: 'pointer', fontSize: 14 }}>🌐</button>
+                </div>
+            </header>
 
-            <div className="flex h-[calc(100vh-80px)] overflow-hidden relative z-10 px-6 pb-6 pt-2">
-                <div className="flex w-full bg-white/[0.02] border border-white/5 backdrop-blur-2xl rounded-3xl overflow-hidden shadow-2xl">
-
-                    {/* Channel Sidebar */}
-                    <div className="w-72 min-w-[288px] bg-white/[0.01] border-l border-white/5 flex flex-col h-full">
-                        <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/[0.01]">
-                            <span className="font-bold text-white/90">القنوات</span>
-                            <button className="w-8 h-8 rounded-lg bg-violet-600/20 hover:bg-violet-600/40 text-violet-400 border border-violet-500/20 shadow-sm flex items-center justify-center transition-colors" onClick={() => setShowNewChannel(true)}>
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                            </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', height: 'calc(100vh - 56px)' }}>
+                {/* Sidebar: Rooms */}
+                <div style={{ background: 'var(--card-bg, #fff)', borderInlineEnd: '1px solid var(--border, rgba(0,0,0,.06))', padding: 8, overflowY: 'auto' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', padding: '8px 10px' }}>🏢 {lang === 'ar' ? 'الغرف' : 'Rooms'}</div>
+                    {rooms.map(r => (
+                        <button key={r.roomId} onClick={() => setActiveRoom(r.roomId)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 10px', borderRadius: 8, border: 'none', background: activeRoom === r.roomId ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'transparent', color: activeRoom === r.roomId ? '#fff' : 'var(--text, #1e293b)', cursor: 'pointer', fontSize: 12, fontWeight: 600, textAlign: 'start', marginBottom: 2, transition: 'all .15s' }}>
+                            <span style={{ fontSize: 16 }}>{r.icon}</span>
+                            <span style={{ flex: 1 }}>{lang === 'ar' ? r.name : r.nameEn}</span>
+                        </button>
+                    ))}
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted, #64748b)', padding: '12px 10px 8px' }}>👥 {lang === 'ar' ? 'الفريق' : 'Team'}</div>
+                    {TEAM.map(m => (
+                        <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', fontSize: 11, color: 'var(--text, #1e293b)' }}>
+                            <span>{m.avatar}</span><span>{m.name}</span>
+                            <span style={{ fontSize: 9, color: 'var(--text-muted, #64748b)', marginInlineStart: 'auto' }}>{m.department === user.department ? '●' : ''}</span>
                         </div>
+                    ))}
+                </div>
 
-                        {showNewChannel && (
-                            <div className="p-4 border-b border-white/5 bg-white/5 pb-5">
-                                <input
-                                    className="w-full bg-[#0d0e1b] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/40 focus:outline-none focus:border-violet-500/50 mb-3"
-                                    placeholder="اسم القناة..."
-                                    value={newChannelName}
-                                    onChange={e => setNewChannelName(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter') createChannel(); if (e.key === 'Escape') setShowNewChannel(false); }}
-                                    autoFocus
-                                />
-                                <div className="flex gap-2">
-                                    <button className="flex-1 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-500 text-white text-xs font-semibold shadow-[0_0_10px_rgba(124,58,237,0.4)] transition-colors" onClick={createChannel}>إنشاء</button>
-                                    <button className="flex-1 py-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors" onClick={() => setShowNewChannel(false)}>إلغاء</button>
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="flex-1 overflow-y-auto p-3 scrollbar-thin">
-                            {channels.map(ch => {
-                                const active = activeChannel === ch.id;
-                                return (
-                                    <div
-                                        key={ch.id}
-                                        onClick={() => setActiveChannel(ch.id)}
-                                        className={`p-3 rounded-xl cursor-pointer mb-1 transition-all flex flex-col gap-1 border border-transparent ${active ? 'bg-violet-500/15 border-violet-500/20 shadow-[0_0_15px_rgba(139,92,246,0.05)]' : 'hover:bg-white/5'}`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className={`font-semibold text-sm flex items-center gap-2 ${active ? 'text-violet-300' : 'text-white/80'}`}>
-                                                <span className={active ? 'text-violet-400' : 'text-white/40'}>{ch.channelType === 'DIRECT' ? '👤' : '#'}</span>
-                                                {ch.name}
-                                            </span>
-                                            {ch.unreadCount > 0 && (
-                                                <span className="w-5 h-5 rounded-full bg-pink-500 text-white text-[10px] flex items-center justify-center font-bold shadow-[0_0_8px_rgba(236,72,153,0.5)]">
-                                                    {ch.unreadCount}
-                                                </span>
-                                            )}
-                                        </div>
-                                        {ch.messages[0] && (
-                                            <div className="text-[11px] text-white/40 truncate flex items-center gap-1.5 pl-5">
-                                                <span className="font-medium text-white/50">{ch.messages[0].user.name.split(' ')[0]}:</span>
-                                                <span>{ch.messages[0].content}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
+                {/* Main: Messages */}
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {/* Room Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border, rgba(0,0,0,.06))', background: 'var(--card-bg, #fff)' }}>
+                        <span style={{ fontSize: 20 }}>{room?.icon || '💬'}</span>
+                        <div><div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text, #1e293b)' }}>{lang === 'ar' ? room?.name : room?.nameEn}</div><div style={{ fontSize: 10, color: 'var(--text-muted, #64748b)' }}>{room?.members.length || 0} {lang === 'ar' ? 'عضو' : 'members'} {room?.aiEnabled ? '• 🤖 AI' : ''}</div></div>
                     </div>
 
-                    {/* Messages Area */}
-                    <div className="flex-1 flex flex-col h-full relative">
-                        {/* Channel Header */}
-                        {activeChannelData && (
-                            <div className="px-6 py-4 border-b border-white/5 bg-white/[0.01] flex items-center gap-4 backdrop-blur-md z-10 shadow-sm">
-                                <h2 className="text-lg font-bold text-white/90 m-0">
-                                    <span className="text-violet-400 mr-1">{activeChannelData.channelType === 'DIRECT' ? '👤' : '#'}</span>
-                                    {activeChannelData.name}
-                                </h2>
-                                {activeChannelData.description && (
-                                    <span className="text-sm text-white/40 border-r border-white/10 pr-4 mr-4 hidden md:inline-block">
-                                        {activeChannelData.description}
-                                    </span>
-                                )}
-                                <div className="mr-auto flex items-center gap-2 text-xs text-white/40 px-3 py-1 bg-white/5 rounded-full">
-                                    👥 {activeChannelData._count.members} عضو
-                                </div>
-                            </div>
-                        )}
+                    {/* Messages */}
+                    <div ref={msgsRef} style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+                        {msgs.length === 0 && <div style={{ textAlign: 'center', color: 'var(--text-muted, #64748b)', padding: 40, fontSize: 13 }}>💬 {lang === 'ar' ? 'ابدأ المحادثة' : 'Start chatting'}</div>}
+                        {msgs.map(renderMessage)}
+                    </div>
 
-                        {/* Messages Feed */}
-                        <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
-                            {messages.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center h-full text-white/40 animate-fade-in-up">
-                                    <span className="text-6xl mb-6 opacity-80 drop-shadow-[0_0_20px_rgba(139,92,246,0.3)]">💬</span>
-                                    <span className="text-xl font-bold text-white mb-2">في انتظار الرسالة الأولى!</span>
-                                    <span className="text-sm">اطرح فكرة، أو استخدم '@' لذكر أحد الزملاء.</span>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-6">
-                                    {messages.map((msg, i) => {
-                                        const showAvatar = i === 0 || messages[i - 1].user.id !== msg.user.id;
-                                        return (
-                                            <div key={msg.id} className={`flex gap-4 ${!showAvatar ? '-mt-4' : ''}`}>
-                                                {showAvatar ? (
-                                                    <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-sm flex-shrink-0" style={{ background: ROLE_COLORS[msg.user.role] || '#64748b' }}>
-                                                        {msg.user.name.charAt(0)}
-                                                    </div>
-                                                ) : <div className="w-10 flex-shrink-0" />}
-                                                <div className="flex-1 max-w-[85%]">
-                                                    {showAvatar && (
-                                                        <div className="flex items-baseline gap-2 mb-1.5">
-                                                            <span className="font-bold text-sm" style={{ color: ROLE_COLORS[msg.user.role] || 'white' }}>{msg.user.name}</span>
-                                                            <span className="text-[11px] text-white/40">{formatTime(msg.createdAt)}</span>
-                                                        </div>
-                                                    )}
-                                                    <div
-                                                        className={`text-sm text-white/90 leading-relaxed max-w-max px-4 py-2.5 rounded-2xl ${msg.user.id === userId ? 'bg-violet-600/60 border border-violet-500/30 rounded-tr-md' : 'bg-white/5 border border-white/5 rounded-tl-md'}`}
-                                                    >
-                                                        <span dangerouslySetInnerHTML={{ __html: formatMessageContent(msg.content) }} />
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    <div ref={messagesEndRef} className="h-4" />
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Input Area */}
-                        <div className="p-4 border-t border-white/5 bg-white/[0.01] relative">
-                            {mentionSearch !== null && mentionResults.length > 0 && (
-                                <GlassCard className="absolute bottom-[calc(100%+8px)] left-4 right-4 max-h-48 overflow-y-auto z-50 p-2 shadow-2xl border-violet-500/20">
-                                    {mentionResults.map((u, i) => (
-                                        <div
-                                            key={u.id}
-                                            onClick={() => insertMention(u)}
-                                            className={`p-2 rounded-xl cursor-pointer flex items-center gap-3 transition-colors ${i === mentionIndex ? 'bg-violet-500/20' : 'hover:bg-white/5'}`}
-                                        >
-                                            <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm" style={{ background: ROLE_COLORS[u.role] || '#64748b' }}>
-                                                {u.name.charAt(0)}
-                                            </div>
-                                            <span className="font-semibold text-sm text-white/90">{u.name}</span>
-                                            <span className="text-[10px] uppercase font-bold text-white/40 ml-auto bg-white/5 px-2 py-0.5 rounded-md">{u.role}</span>
-                                        </div>
-                                    ))}
-                                </GlassCard>
-                            )}
-                            <div className="flex items-end gap-3 bg-[#0d0e1b]/80 border border-white/10 rounded-2xl p-2 focus-within:border-violet-500/50 focus-within:ring-1 focus-within:ring-violet-500/50 transition-all shadow-inner">
-                                <textarea
-                                    ref={inputRef as any}
-                                    className="flex-1 bg-transparent text-sm text-white placeholder-white/40 focus:outline-none resize-none pt-2.5 px-3 min-h-[40px] max-h-[120px]"
-                                    placeholder="اكتب رسالة... استخدم @ لذكر زميل في الفريق"
-                                    rows={1}
-                                    value={input}
-                                    onChange={e => {
-                                        handleInputChange(e as any);
-                                        // Auto-resize textarea
-                                        e.target.style.height = 'auto';
-                                        e.target.style.height = (e.target.scrollHeight) + 'px';
-                                    }}
-                                    onKeyDown={handleKeyDown}
-                                />
-                                <button
-                                    className="p-2.5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_10px_rgba(124,58,237,0.3)] transition-colors flex-shrink-0 mb-0.5"
-                                    onClick={sendMessage}
-                                    disabled={!input.trim()}
-                                >
-                                    <svg className="w-5 h-5 -rotate-90 transform translate-x-px translate-y-px" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                    {/* Mention Autocomplete */}
+                    {showMentions && filteredMentions.length > 0 && (
+                        <div style={{ background: 'var(--card-bg, #fff)', border: '1px solid var(--border, rgba(0,0,0,.1))', borderRadius: 8, margin: '0 16px', padding: 4, boxShadow: '0 4px 12px rgba(0,0,0,.1)' }}>
+                            {filteredMentions.slice(0, 6).map(m => (
+                                <button key={m.id} onClick={() => insertMention(m)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '6px 10px', border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 12, textAlign: 'start', borderRadius: 6 }}>
+                                    <span>{m.avatar}</span><span style={{ fontWeight: 600 }}>{m.name}</span><span style={{ fontSize: 10, color: 'var(--text-muted, #64748b)' }}>{m.position}</span>
                                 </button>
-                            </div>
+                            ))}
                         </div>
+                    )}
+
+                    {/* Input */}
+                    <div style={{ display: 'flex', gap: 8, padding: '10px 16px', borderTop: '1px solid var(--border, rgba(0,0,0,.06))', background: 'var(--card-bg, #fff)' }}>
+                        <input value={input} onChange={handleInput} onKeyDown={e => e.key === 'Enter' && send()} placeholder={lang === 'ar' ? '@ذكر شخص أو اكتب رسالة...' : '@mention or type...'} style={{ flex: 1, border: '1px solid var(--border, rgba(0,0,0,.1))', borderRadius: 10, padding: '8px 14px', fontSize: 13, background: 'var(--bg-main, #f8fafc)', color: 'var(--text, #1e293b)', outline: 'none' }} />
+                        <button onClick={send} style={{ width: 40, height: 40, borderRadius: 10, border: 'none', background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', cursor: 'pointer', fontSize: 16 }}>➤</button>
                     </div>
                 </div>
             </div>
-        </AppLayout>
+        </div>
     );
 }

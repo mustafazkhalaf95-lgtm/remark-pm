@@ -3,6 +3,8 @@
 import { useState, useEffect, useTransition, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { getCreativeStore } from '@/lib/creativeStore';
+import { useSettings } from '@/lib/useSettings';
+import { TEAM } from '@/lib/teamStore';
 import { texts } from '@/lib/texts';
 import styles from "./page.module.css";
 
@@ -28,8 +30,7 @@ function persistState(key: string, value: unknown) {
 export default function Home() {
   const [expanded, setExpanded] = useState(false);
   const [showTaskList, setShowTaskList] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  const [lang, setLang] = useState<'ar' | 'en'>('ar');
+  const { theme, lang, toggleTheme, toggleLang } = useSettings();
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardData, setWizardData] = useState({
@@ -85,15 +86,55 @@ export default function Home() {
   });
   const [monthlySummaries, setMonthlySummaries] = useState<Record<string, any[]>>({});
 
-  // ── Hydrate from localStorage AFTER mount (prevents SSR mismatch) ──
+  // Add Viewer modal state
+  const [showAddViewer, setShowAddViewer] = useState(false);
+  const [boardViewers, setBoardViewers] = useState<string[]>(['mustafa_khalaf', 'yousef_kazem', 'seif_ali']);
+
+  // ── Hydrate from localStorage + DB AFTER mount ──
   const hydrated = useRef(false);
   useEffect(() => {
     setPipelineClients(loadPersistedState('pipelineClients', []));
     setPipelineChatMsgs(loadPersistedState('pipelineChatMsgs', {}));
     setPipelineStageData(loadPersistedState('pipelineStageData', {}));
-    setConvertedClients(loadPersistedState('convertedClients', []));
     setConvertedChatMsgs(loadPersistedState('convertedChatMsgs', {}));
     setMonthlySummaries(loadPersistedState('monthlySummaries', {}));
+
+    // Load real clients from DB and merge with localStorage
+    const savedClients = loadPersistedState<any[]>('convertedClients', []);
+    if (savedClients.length > 0) {
+      setConvertedClients(savedClients);
+    } else {
+      // Fetch from API if no localStorage data
+      fetch('/api/clients?take=50').then(r => r.json()).then(data => {
+        const dbClients = (data.data || data || []).map((c: any) => ({
+          id: c.id,
+          name: c.nameAr || c.name,
+          nameEn: c.name,
+          data: {
+            clientName: c.nameAr || c.name,
+            industry: c.sectorAr || c.sector || '',
+            planType: c.planType || '',
+            budget: c.budget || '',
+            goals: [],
+            platforms: [],
+            targetAudience: '',
+            contentTypes: [],
+            postsPerWeek: '5',
+            startDate: '',
+            notes: c.notes || '',
+            socialLinks: c.socialLinks ? (typeof c.socialLinks === 'string' ? JSON.parse(c.socialLinks) : c.socialLinks) : [],
+            meetingBrief: '',
+            nextMeetingDate: '',
+            meetingAttendees: [],
+          },
+          avatar: c.avatar || '🏢',
+          status: c.status || 'active',
+          tasks: [],
+          fromDB: true,
+        }));
+        if (dbClients.length > 0) setConvertedClients(dbClients);
+      }).catch(() => {});
+    }
     hydrated.current = true;
   }, []);
 
@@ -144,13 +185,6 @@ export default function Home() {
   useEffect(() => { if (hydrated.current) persistState('pipelineChatMsgs', pipelineChatMsgs); }, [pipelineChatMsgs]);
   useEffect(() => { if (hydrated.current) persistState('wardaData', wardaData); }, [wardaData]);
 
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [theme]);
 
   const [chatInput, setChatInput] = useState("");
   const [chatMessages, setChatMessages] = useState<any[]>([]);
@@ -259,11 +293,13 @@ export default function Home() {
       const calLines = calendarTasks.map(ct => `  📌 ${t.calWeek} ${ct.week} - ${ct.day}: ${ct.task} (${ct.platform})`).join('\n');
       const convMsg = t.conversionMsg.replace('{name}', pc.name || 'New Client');
       const taskItems = calendarTasks.slice(0, 8).map(ct => ({ text: `${t.calWeek} ${ct.week} - ${ct.day}: ${ct.task} (${ct.platform})`, status: 'pending' as const }));
-      const stableClientId = `client_${(pc.name || 'new').replace(/\s+/g, '_').toLowerCase()}_${Date.now()}`;
+      const stableClientId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
       const savedBudget = agreementData.agreedBudget;
       const savedContentTypes = pc.data?.contentTypes ? [...pc.data.contentTypes] : [];
       const pcName = pc.name || 'New Client';
-      const pcData = { ...pc.data };
+      // Strip non-serializable File objects from data before persisting
+      const { files: _stripFiles, ...serializableData } = (pc.data || {});
+      const pcData = { ...serializableData };
       const newClient = { name: pcName, data: { ...pcData, ...agreementData, stageHistory: stageInfo }, calendar: calendarTasks, tasks: taskItems, convertedAt: new Date().toISOString(), aiMessage: `${convMsg}\n\n${t.calendarGenerated}\n${calLines}`, linkedClientId: stableClientId };
       const newIdx = convertedClients.length;
 
@@ -273,56 +309,43 @@ export default function Home() {
       persistState('pipelineClients', safePipeline);
       persistState('convertedClients', [...convertedClients, newClient]);
 
-      // ── Phase 1: Close modal IMMEDIATELY ──
+      // ── Phase 1: Close modal + update pipeline state TOGETHER ──
       setShowAgreement(false);
       setAgreementData({ agreedBudget: '', accountMgr: '', contractDuration: '' });
+      const updated = [...pipelineClients];
+      updated[idx] = { ...updated[idx], converted: true, convertedClientId: stableClientId };
+      setPipelineClients(updated);
+      setExpandedPipelineIdx(null);
 
-      // ── Phase 2 (150ms): Hide pipeline card ──
-      setTimeout(() => {
-        try {
-          const updated = [...pipelineClients];
-          updated[idx] = { ...updated[idx], converted: true, convertedClientId: stableClientId };
-          setPipelineClients(updated);
-          setExpandedPipelineIdx(null);
-        } catch (e) { console.error('Phase 2 error:', e); }
-      }, 150);
-
-      // ── Phase 3 (350ms): Add converted client (low priority) ──
+      // ── Phase 2 (300ms): Add converted client + expand + reset ──
       setTimeout(() => {
         try {
           startTransition(() => {
             setConvertedClients(prev => [...prev, newClient]);
             setConvertedChatMsgs(prev => ({ ...prev, [newIdx]: [{ sender: t.remarkAssistant, avatar: '🤖', text: `${convMsg}\n\n${t.calendarGenerated}\n${calLines}`, time: 'AI', type: 'ai' }] }));
+            setExpandedConvertedIdx(newIdx);
+            setExpanded(false);
           });
-        } catch (e) { console.error('Phase 3 error:', e); }
-      }, 350);
-
-      // ── Phase 4 (500ms): Expand + scroll + reset ──
-      setTimeout(() => {
-        try {
-          setExpandedConvertedIdx(newIdx);
-          setExpanded(false);
           setIsConverting(false);
           convertingRef.current = false;
           window.scrollTo({ top: 0, behavior: 'smooth' });
-        } catch (e) { console.error('Phase 4 error:', e); }
-      }, 500);
+        } catch (e) { console.error('Phase 2 error:', e); setIsConverting(false); convertingRef.current = false; }
+      }, 300);
 
-      // ── Phase 5 (800ms): Creative store sync (background, batched) ──
+      // ── Phase 3 (2000ms): Creative store sync (delayed to avoid crash) ──
       setTimeout(() => {
         try {
           const creativeStore = getCreativeStore();
+          creativeStore.batchStart();
           try {
-            creativeStore.batchStart();
             creativeStore.syncClient({ clientId: stableClientId, name: pcName, nameEn: pcName, sector: pcData.industry || '', sectorEn: pcData.industry || '', planType: pcData.planType || '', budget: pcData.budget || savedBudget || '', socialLinks: pcData.socialLinks || [], avatar: '✅', createdAt: new Date().toISOString().split('T')[0], linkedFromMarketing: true, marketingConvertedAt: new Date().toISOString(), marketingTaskCount: savedContentTypes.length, marketingTaskTitles: savedContentTypes });
             for (const ct of savedContentTypes) {
               creativeStore.createRequestFromMarketingTask(stableClientId, ct, `mkt_auto_${Date.now()}_${Math.random().toString(36).slice(2, 4)}`);
             }
-          } catch (e: any) { console.error('Creative store sync error:', e); } finally {
-            try { creativeStore.batchEnd(); } catch (e) { console.error('batchEnd error:', e); }
-          }
-        } catch (e) { console.error('Phase 5 error:', e); }
-      }, 800);
+          } catch (e: any) { console.error('Creative store sync error:', e); }
+          try { creativeStore.batchEnd(); } catch (e) { console.error('batchEnd error:', e); }
+        } catch (e) { console.error('Phase 3 error:', e); }
+      }, 2000);
     } catch (e) {
       console.error('handleConvertToClient error:', e);
       setIsConverting(false);
@@ -365,20 +388,27 @@ export default function Home() {
         <div className={styles.headerLeft}>
           <div className={styles.accessGroup}>
             <div className={styles.avatarStack}>
-              <div className={`${styles.stackedAvatar} ${styles.avatarCeo}`} title={t.ceo}>ص</div>
-              <div className={`${styles.stackedAvatar} ${styles.avatarCoo}`} title={t.coo}>ف</div>
-              <div className={`${styles.stackedAvatar} ${styles.avatarMktg}`} title={t.marketingManager}>م</div>
+              {boardViewers.slice(0, 4).map(vid => {
+                const member = TEAM.find((m: any) => m.id === vid);
+                if (!member) return null;
+                return (
+                  <div key={vid} className={styles.stackedAvatar} title={member.name} style={{ background: `linear-gradient(135deg, ${member.color}, ${member.color}88)` }}>
+                    {member.avatar}
+                  </div>
+                );
+              })}
+              {boardViewers.length > 4 && <div className={styles.stackedAvatar} style={{ background: '#64748b', fontSize: 11 }}>+{boardViewers.length - 4}</div>}
             </div>
-            <button className={styles.addViewerBtn} title={t.addViewer}>
+            <button className={styles.addViewerBtn} title={t.addViewer} onClick={() => setShowAddViewer(true)}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5.5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
               <span>{t.addViewer}</span>
             </button>
           </div>
           <div className={styles.headerDivider} />
-          <button className={styles.iconBtn} title={t.themeToggle} onClick={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}>
+          <button className={styles.iconBtn} title={t.themeToggle} onClick={toggleTheme}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           </button>
-          <button className={styles.iconBtn} title={t.langToggle} onClick={() => setLang(prev => prev === 'ar' ? 'en' : 'ar')}>
+          <button className={styles.iconBtn} title={t.langToggle} onClick={toggleLang}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
           </button>
           <div className={styles.userAvatar}>م.خ</div>
@@ -389,6 +419,7 @@ export default function Home() {
             <Link href="/creative" className={styles.navInactive}>{lang === 'ar' ? '🎨 الإبداعي' : '🎨 Creative'}</Link>
             <Link href="/production" className={styles.navInactive}>{lang === 'ar' ? '🎬 الإنتاج' : '🎬 Production'}</Link>
             <Link href="/publishing" className={styles.navInactive}>{lang === 'ar' ? '📢 النشر' : '📢 Publishing'}</Link>
+            <Link href="/settings" className={styles.navInactive}>{lang === 'ar' ? '⚙️ الإعدادات' : '⚙️ Settings'}</Link>
           </div>
         </div>
       </header>
@@ -828,7 +859,7 @@ export default function Home() {
         <div className={styles.sectionHeader}>
           <span className={styles.sectionTitle}>🧑‍💼 {t.clients}</span>
           <div className={styles.sectionLine} />
-          <span className={styles.sectionCount}>{convertedClients.length + 1} {t.clientCount}</span>
+          <span className={styles.sectionCount}>{convertedClients.length} {t.clientCount}</span>
         </div>
 
         {/* ==================== CLIENT CARDS ==================== */}
@@ -1042,8 +1073,8 @@ export default function Home() {
             </div>
           ))}
 
-          {/* ===== الوردة — COLLAPSED ===== */}
-          {!expanded && (
+          {/* ===== الوردة — COLLAPSED (removed) ===== */}
+          {false && (
             <div className={`${styles.clientCardSmall} ${styles.horizontalCard}`} onClick={() => setExpanded(true)}>
               <div className={styles.horizontalCardContent}>
                 <div className={styles.horizontalCardRight}>
@@ -1090,8 +1121,8 @@ export default function Home() {
             </div>
           )}
 
-          {/* ===== الوردة — EXPANDED ===== */}
-          {expanded && (
+          {/* ===== الوردة — EXPANDED (removed) ===== */}
+          {false && (
             <div className={`${styles.clientCard} ${styles.clientCardExpanded}`}>
               {/* Header */}
               <div className={styles.clientHeader}>
@@ -1612,23 +1643,6 @@ export default function Home() {
               <button className={styles.wizardCloseBtn} onClick={() => setShowEditPlanSelector(false)}>✕</button>
             </div>
             <div className={styles.clientSelectorList}>
-              {/* الوردة */}
-              <div className={styles.clientSelectorItem} onClick={() => {
-                setEditingClientType('warda');
-                setEditingClientIdx(null);
-                setIsEditMode(true);
-                setWizardData(wardaData as any);
-                setShowEditPlanSelector(false);
-                setShowWizard(true);
-                setWizardStep(1);
-              }}>
-                <div className={styles.clientSelectorAvatar}>🌹</div>
-                <div className={styles.clientSelectorInfo}>
-                  <div className={styles.clientSelectorName}>{t.clientName}</div>
-                  <div className={styles.clientSelectorSub}>{t.clientType}</div>
-                </div>
-                <div className={styles.clientSelectorArrow}>←</div>
-              </div>
               {/* Converted clients */}
               {convertedClients.map((cc: any, ci: number) => (
                 <div key={ci} className={styles.clientSelectorItem} onClick={() => {
@@ -1662,8 +1676,8 @@ export default function Home() {
               ))}
               {convertedClients.length === 0 && (
                 <div className={styles.clientSelectorEmpty}>
-                  <span>🌹 {t.clientName}</span>
-                  <span style={{ opacity: 0.5, fontSize: 12, marginTop: 4 }}>{lang === 'ar' ? 'هو العميل الوحيد حالياً' : 'is the only client currently'}</span>
+                  <span>{lang === 'ar' ? 'لا يوجد عملاء حالياً' : 'No clients yet'}</span>
+                  <span style={{ opacity: 0.5, fontSize: 12, marginTop: 4 }}>{lang === 'ar' ? 'أضف عميل جديد من الأعلى' : 'Add a new client from above'}</span>
                 </div>
               )}
             </div>
@@ -1680,21 +1694,7 @@ export default function Home() {
               <button className={styles.wizardCloseBtn} onClick={() => setShowSummarySelector(false)}>✕</button>
             </div>
             <div className={styles.clientSelectorList}>
-              {/* الوردة */}
-              <div className={styles.clientSelectorItem} onClick={() => {
-                setSummaryClientType('warda');
-                setSummaryClientIdx(null);
-                setSummaryData({ month: '', year: '2026', postsPublished: '', engagement: '', followersGained: '', bestPost: '', highlights: '', challenges: '', recommendations: '', clientFeedback: '' });
-                setShowSummarySelector(false);
-                setShowMonthlySummary(true);
-              }}>
-                <div className={styles.clientSelectorAvatar}>🌹</div>
-                <div className={styles.clientSelectorInfo}>
-                  <div className={styles.clientSelectorName}>{t.clientName}</div>
-                  <div className={styles.clientSelectorSub}>{t.clientType}</div>
-                </div>
-                <div className={styles.clientSelectorArrow}>←</div>
-              </div>
+
               {/* Converted clients */}
               {convertedClients.map((cc: any, ci: number) => (
                 <div key={ci} className={styles.clientSelectorItem} onClick={() => {
@@ -1822,6 +1822,41 @@ export default function Home() {
                 }
                 setShowMonthlySummary(false);
               }}>{t.summarySubmit}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ Add Viewer Modal ═══ */}
+      {showAddViewer && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setShowAddViewer(false)}>
+          <div style={{ width: 460, maxWidth: '90vw', maxHeight: '80vh', borderRadius: 20, background: 'var(--bg, #fff)', border: '1px solid var(--border, rgba(0,0,0,0.1))', boxShadow: '0 20px 60px rgba(0,0,0,0.3)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border, rgba(0,0,0,0.1))', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg, rgba(99,102,241,0.08), rgba(139,92,246,0.06))' }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary, #1e293b)' }}>👥 {lang === 'ar' ? 'إدارة المشاهدين' : 'Manage Viewers'}</div>
+              <button onClick={() => setShowAddViewer(false)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>✕</button>
+            </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+              {TEAM.map((m: any) => {
+                const isViewer = boardViewers.includes(m.id);
+                return (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 4, background: isViewer ? 'rgba(99,102,241,0.08)' : 'transparent', transition: 'all .2s', cursor: 'pointer' }} onClick={() => {
+                    if (isViewer) setBoardViewers(prev => prev.filter(v => v !== m.id));
+                    else setBoardViewers(prev => [...prev, m.id]);
+                  }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(135deg, ${m.color}, ${m.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff', fontWeight: 800, flexShrink: 0 }}>{m.avatar}</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary, #1e293b)' }}>{m.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary, #64748b)' }}>{m.position}</div>
+                    </div>
+                    <button style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: isViewer ? 'rgba(239,68,68,0.1)' : 'rgba(99,102,241,0.1)', color: isViewer ? '#ef4444' : '#6366f1', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, transition: 'all .2s' }} title={isViewer ? (lang === 'ar' ? 'إزالة' : 'Remove') : (lang === 'ar' ? 'إضافة' : 'Add')}>
+                      {isViewer ? '−' : '+'}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border, rgba(0,0,0,0.1))', textAlign: 'center', fontSize: 12, fontWeight: 600, color: 'var(--text-secondary, #64748b)' }}>
+              {boardViewers.length} {lang === 'ar' ? 'مشاهدين في هذا البورد' : 'viewers on this board'}
             </div>
           </div>
         </div>

@@ -1,21 +1,9 @@
-// Prisma client stub — schema.prisma is missing from this repo
-// This allows the build to pass; API routes will fail at runtime until DB is set up
-// TODO: Restore schema.prisma and run `npx prisma generate` to get the real client
+import { PrismaClient } from '@prisma/client';
 
-const handler = {
-    get(_target: any, prop: string): any {
-        if (prop === '$queryRawUnsafe' || prop === '$executeRawUnsafe') {
-            return async () => { throw new Error('Database not configured — schema.prisma missing'); };
-        }
-        // Return a proxy for any model access (e.g., prisma.user.findMany)
-        return new Proxy({}, {
-            get(_t: any, method: string) {
-                return async () => { throw new Error(`Database not configured — prisma.${prop}.${method}() called but schema.prisma is missing`); };
-            }
-        });
-    }
-};
+const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-const prisma = new Proxy({}, handler);
+const prisma = globalForPrisma.prisma || new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export default prisma;

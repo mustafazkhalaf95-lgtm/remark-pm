@@ -1,0 +1,601 @@
+// ═══════════════════════════════════════════════════════════════
+// Remark PM — Prisma Schema
+// SQLite-backed persistence for the entire platform
+// ═══════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ORGANIZATION LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model Organization {
+  id          String   @id @default(cuid())
+  name        String
+  nameAr      String   @default("")
+  logo        String   @default("")
+  timezone    String   @default("Asia/Baghdad")
+  language    String   @default("ar")
+  workWeek    String   @default("sun-thu") // sun-thu, mon-fri, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  departments Department[]
+  settings    SystemSetting[]
+  integrations IntegrationSetting[]
+}
+
+model Department {
+  id             String   @id @default(cuid())
+  name           String
+  nameAr         String   @default("")
+  slug           String   @unique
+  description    String   @default("")
+  descriptionAr  String   @default("")
+  color          String   @default("#6366f1")
+  icon           String   @default("📋")
+  isActive       Boolean  @default(true)
+  headUserId     String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  headUser       User?        @relation("DepartmentHead", fields: [headUserId], references: [id])
+  userDepartments UserDepartment[]
+  settings       DepartmentSetting[]
+
+  @@index([organizationId])
+  @@index([slug])
+}
+
+model DepartmentSetting {
+  id           String   @id @default(cuid())
+  departmentId String
+  key          String
+  value        String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, key])
+}
+
+model SystemSetting {
+  id             String   @id @default(cuid())
+  organizationId String
+  category       String   // general, notifications, security, branding
+  key            String
+  value          String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, key])
+}
+
+model IntegrationSetting {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String   // notebooklm, openai, storage, webhook
+  nameAr         String   @default("")
+  provider       String   @default("")
+  isEnabled      Boolean  @default(false)
+  config         String   @default("{}") // JSON config
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, name])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// IDENTITY & ACCESS LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  password     String   @default("")
+  status       String   @default("active") // active, inactive, suspended
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  profile          UserProfile?
+  userRoles        UserRole[]
+  userDepartments  UserDepartment[]
+  userClients      UserClient[]
+  approvalAuthorities ApprovalAuthority[]
+  headOfDepartments   Department[] @relation("DepartmentHead")
+  auditLogs        AuditLog[]
+  activities       ActivityLog[]
+  comments         Comment[]
+  approvalsMade    Approval[]
+  notifications    Notification[]
+
+  // User assignment relations
+  marketingAssignments    MarketingTask[]    @relation("MarketingAssignee")
+  creativeConceptRequests CreativeRequest[]  @relation("CreativeConceptWriter")
+  creativeExecRequests    CreativeRequest[]  @relation("CreativeExecutor")
+  productionAssignments   ProductionJob[]    @relation("ProductionAssignee")
+  publishingReviews       PublishingItem[]   @relation("PublishingReviewer")
+
+  @@index([email])
+  @@index([status])
+}
+
+model UserProfile {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  fullName        String
+  fullNameAr      String   @default("")
+  displayName     String   @default("")
+  displayNameAr   String   @default("")
+  avatar          String   @default("")
+  phone           String   @default("")
+  employeeCode    String   @default("")
+  bio             String   @default("")
+  bioAr           String   @default("")
+  positionId      String?
+  reportingToId   String?
+  timezone        String   @default("Asia/Baghdad")
+  language        String   @default("ar")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  position    Position? @relation(fields: [positionId], references: [id])
+  reportingTo UserProfile? @relation("ReportsTo", fields: [reportingToId], references: [id])
+  directReports UserProfile[] @relation("ReportsTo")
+
+  @@index([positionId])
+}
+
+model Position {
+  id          String   @id @default(cuid())
+  title       String
+  titleAr     String   @default("")
+  category    String   @default("staff") // executive, client, marketing, creative, production, publishing, admin
+  level       Int      @default(0) // 0=staff, 1=coordinator, 2=manager, 3=director, 4=c-suite
+  description String   @default("")
+  descriptionAr String @default("")
+  isDefault   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  profiles UserProfile[]
+
+  @@index([category])
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  nameAr      String   @default("")
+  description String   @default("")
+  descriptionAr String @default("")
+  scope       String   @default("department") // platform, department, project
+  isSystem    Boolean  @default(false) // cannot be deleted
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  permissions RolePermission[]
+  userRoles   UserRole[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  name        String
+  nameAr      String   @default("")
+  module      String   // settings, marketing, creative, production, publishing, clients, reports, approvals
+  category    String   @default("action") // view, action, manage, approve, export
+  description String   @default("")
+  createdAt   DateTime @default(now())
+
+  rolePermissions RolePermission[]
+
+  @@index([module])
+  @@index([category])
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+}
+
+model UserRole {
+  id     String @id @default(cuid())
+  userId String
+  roleId String
+  isPrimary Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, roleId])
+}
+
+model UserDepartment {
+  id           String @id @default(cuid())
+  userId       String
+  departmentId String
+  isPrimary    Boolean @default(false)
+  createdAt    DateTime @default(now())
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, departmentId])
+}
+
+model UserClient {
+  id       String @id @default(cuid())
+  userId   String
+  clientId String
+  role     String @default("member") // lead, member, viewer
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// APPROVAL LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model ApprovalAuthority {
+  id        String @id @default(cuid())
+  userId    String
+  scope     String // concept_preliminary, concept_final, export, publishing, unblock, revision
+  scopeAr   String @default("")
+  level     Int    @default(1) // 1=can approve, 2=must approve (required)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, scope])
+  @@index([scope])
+}
+
+model ApprovalPolicy {
+  id          String @id @default(cuid())
+  name        String
+  nameAr      String @default("")
+  workflow    String // marketing_plan, creative_concept, production_review, final_delivery, publishing
+  stage       String @default("")
+  requiredRoleId String?
+  requiredPositionId String?
+  minApprovals Int    @default(1)
+  isActive    Boolean @default(true)
+  description String @default("")
+  descriptionAr String @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workflow])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BUSINESS LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model Client {
+  id          String   @id @default(cuid())
+  name        String
+  nameAr      String   @default("")
+  sector      String   @default("")
+  sectorAr    String   @default("")
+  planType    String   @default("")
+  budget      String   @default("")
+  avatar      String   @default("✅")
+  status      String   @default("active") // active, paused, archived
+  socialLinks String   @default("[]") // JSON array
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  archivedAt  DateTime?
+
+  campaigns      Campaign[]
+  marketingTasks MarketingTask[]
+  creativeRequests CreativeRequest[]
+  productionJobs ProductionJob[]
+  publishingItems PublishingItem[]
+  assets         Asset[]
+  userClients    UserClient[]
+  activities     ActivityLog[]
+
+  @@index([status])
+}
+
+model Campaign {
+  id          String   @id @default(cuid())
+  clientId    String
+  name        String
+  nameAr      String   @default("")
+  description String   @default("")
+  status      String   @default("planning") // planning, active, paused, completed, archived
+  startDate   DateTime?
+  endDate     DateTime?
+  budget      String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client         Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  marketingTasks MarketingTask[]
+  creativeRequests CreativeRequest[]
+  productionJobs ProductionJob[]
+  publishingItems PublishingItem[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model MarketingTask {
+  id          String   @id @default(cuid())
+  clientId    String
+  campaignId  String?
+  title       String
+  titleAr     String   @default("")
+  description String   @default("")
+  status      String   @default("pending") // pending, in_progress, review, approved, completed
+  priority    String   @default("medium")
+  assignedTo  String   @default("")
+  assigneeId  String?
+  platform    String   @default("")
+  contentType String   @default("")
+  dueDate     DateTime?
+  completedAt DateTime?
+  // Cross-board sync
+  linkedCreativeRequestId String?
+  syncStatus  String   @default("none") // none, pending, synced, failed
+  lastSyncedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  assignee User?     @relation("MarketingAssignee", fields: [assigneeId], references: [id])
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([dueDate])
+}
+
+model CreativeRequest {
+  id           String   @id @default(cuid())
+  clientId     String
+  campaignId   String?
+  title        String
+  titleAr      String   @default("")
+  category     String   @default("social_post")
+  brief        String   @default("")
+  status       String   @default("new_request")
+  priority     String   @default("medium")
+  assignedTo   String   @default("")
+  conceptWriterId String?
+  executorId   String?
+  platform     String   @default("")
+  format       String   @default("")
+  dueDate      DateTime?
+  reviewRound  Int      @default(0)
+  conceptApproved Boolean @default(false)
+  finalApproved Boolean  @default(false)
+  blocked      Boolean  @default(false)
+  blockReason  String   @default("")
+  // Cross-board sync
+  linkedMarketingTaskId  String?
+  linkedProductionJobId  String?
+  syncStatus   String   @default("none") // none, pending, synced, failed
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  client        Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign      Campaign? @relation(fields: [campaignId], references: [id])
+  conceptWriter User?     @relation("CreativeConceptWriter", fields: [conceptWriterId], references: [id])
+  executor      User?     @relation("CreativeExecutor", fields: [executorId], references: [id])
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([conceptWriterId])
+  @@index([executorId])
+  @@index([dueDate])
+}
+
+model ProductionJob {
+  id          String   @id @default(cuid())
+  clientId    String
+  campaignId  String?
+  title       String
+  titleAr     String   @default("")
+  jobType     String   @default("video") // video, photo, motion, audio
+  status      String   @default("pending")
+  priority    String   @default("medium")
+  assignedTo  String   @default("")
+  assigneeId  String?
+  shootDate   DateTime?
+  dueDate     DateTime?
+  location    String   @default("")
+  equipment   String   @default("[]") // JSON
+  deliverables String  @default("[]") // JSON
+  // Cross-board sync
+  linkedCreativeRequestId String?
+  syncStatus  String   @default("none")
+  lastSyncedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  assignee User?     @relation("ProductionAssignee", fields: [assigneeId], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([dueDate])
+}
+
+model PublishingItem {
+  id          String   @id @default(cuid())
+  clientId    String
+  campaignId  String?
+  title       String
+  titleAr     String   @default("")
+  platform    String   @default("")
+  status      String   @default("draft") // draft, scheduled, published, archived
+  scheduledAt DateTime?
+  publishedAt DateTime?
+  content     String   @default("")
+  mediaUrls   String   @default("[]") // JSON
+  reviewerId  String?
+  // Cross-board sync
+  linkedProductionJobId String?
+  linkedCreativeRequestId String?
+  syncStatus  String   @default("none")
+  lastSyncedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  campaign Campaign? @relation(fields: [campaignId], references: [id])
+  reviewer User?     @relation("PublishingReviewer", fields: [reviewerId], references: [id])
+
+  @@index([clientId])
+  @@index([status])
+  @@index([reviewerId])
+  @@index([scheduledAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ASSETS & COLLABORATION LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model Asset {
+  id          String   @id @default(cuid())
+  clientId    String?
+  name        String
+  category    String   @default("general") // logo, brand_guide, visual_ref, template, font, general
+  fileUrl     String   @default("")
+  fileType    String   @default("")
+  fileSize    Int      @default(0)
+  description String   @default("")
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client Client? @relation(fields: [clientId], references: [id])
+
+  @@index([clientId])
+  @@index([category])
+}
+
+model Comment {
+  id          String   @id @default(cuid())
+  entityType  String   // creative_request, production_job, marketing_task, publishing_item
+  entityId    String
+  userId      String
+  text        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+model Approval {
+  id          String   @id @default(cuid())
+  entityType  String   // creative_concept, creative_final, production_review, publishing
+  entityId    String
+  userId      String
+  decision    String   // approved, rejected, revision_requested
+  notes       String   @default("")
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // approval, deadline, mention, report, system
+  title     String
+  titleAr   String   @default("")
+  message   String   @default("")
+  messageAr String   @default("")
+  isRead    Boolean  @default(false)
+  entityType String  @default("")
+  entityId  String   @default("")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  clientId   String?
+  entityType String   @default("")
+  entityId   String   @default("")
+  action     String   // created, updated, deleted, approved, rejected, assigned, status_changed
+  details    String   @default("") // JSON
+  createdAt  DateTime @default(now())
+
+  user   User?   @relation(fields: [userId], references: [id])
+  client Client? @relation(fields: [clientId], references: [id])
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String   // settings_changed, role_assigned, user_created, permission_updated
+  category  String   @default("system") // system, user, role, department, settings, security
+  details   String   @default("{}") // JSON with before/after
+  ipAddress String   @default("")
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([category])
+  @@index([createdAt])
+}

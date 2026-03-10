@@ -8,8 +8,9 @@ interface ColumnInfo { cid: number; name: string; type: string; notnull: number;
 interface CustomField { id: string; name: string; displayName: string; fieldType: string; options: string; position: number; boardFields: { board: { id: string; name: string; color: string } }[]; _count: { values: number } }
 
 export default function AdminPage() {
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
     const userRole = (session?.user as any)?.role;
+    const isDev = process.env.NODE_ENV !== 'production';
 
     // SQL Console
     const [sqlQuery, setSqlQuery] = useState('SELECT * FROM Card LIMIT 20');
@@ -143,10 +144,25 @@ export default function AdminPage() {
         setCustomFields(prev => prev.filter(f => f.id !== fieldId));
     };
 
-    if (userRole !== 'CEO' && userRole !== 'COO') {
+    // Show loading while session is being fetched
+    if (status === 'loading') {
         return (
             <AppLayout>
-                <div className="flex items-center justify-center h-full">
+                <div className="flex items-center justify-center h-full" style={{ background: '#0a0b14', minHeight: 'calc(100vh - 60px)' }}>
+                    <div className="text-center text-white/50">
+                        <div className="w-8 h-8 border-t-2 border-amber-400 rounded-full animate-spin mx-auto mb-4" />
+                        <div className="text-sm">جارٍ التحميل...</div>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
+    // In dev mode, bypass role check (no active session). In production, require CEO/COO.
+    if (!isDev && userRole !== 'CEO' && userRole !== 'COO') {
+        return (
+            <AppLayout>
+                <div className="flex items-center justify-center h-full" style={{ background: '#0a0b14', minHeight: 'calc(100vh - 60px)' }}>
                     <div className="text-center text-white/50">
                         <div className="text-5xl mb-4">🔒</div>
                         <div className="text-lg font-bold">لا يمكنك الوصول</div>
@@ -159,7 +175,7 @@ export default function AdminPage() {
 
     return (
         <AppLayout>
-            <div className="p-6 overflow-y-auto h-full">
+            <div className="p-6 overflow-y-auto h-full" style={{ background: 'linear-gradient(135deg, #0a0b14 0%, #1a1b2e 50%, #0d0e1b 100%)', minHeight: 'calc(100vh - 60px)' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>

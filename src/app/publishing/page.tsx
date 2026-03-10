@@ -4,6 +4,7 @@ import Link from 'next/link';
 import s from './page.module.css';
 import { getPublishingStore, PUB_STAGES, PUB_STAGE_META, POST_CAT_AR, POST_CAT_EN, POST_CAT_ICON, PUB_TEAM, POST_CATEGORIES, PLATFORMS, type PubStage, type PublishingPost } from '@/lib/publishingStore';
 import { getCreativeStore } from '@/lib/creativeStore';
+import { useSettings } from '@/lib/useSettings';
 
 export default function PublishingHQ() {
     const store = getPublishingStore();
@@ -11,8 +12,7 @@ export default function PublishingHQ() {
     const ver = useSyncExternalStore(cb => store.subscribe(cb), () => store.getVersion(), () => 0);
     useSyncExternalStore(cb => cStore.subscribe(cb), () => cStore.getVersion(), () => 0);
 
-    const [theme, setTheme] = useState<'light' | 'dark'>('light');
-    const [lang, setLang] = useState<'ar' | 'en'>('ar');
+    const { theme, lang, toggleTheme, toggleLang } = useSettings();
     const [toast, setToast] = useState('');
     const [showNewPost, setShowNewPost] = useState(false);
     const [selectedPost, setSelectedPost] = useState<string | null>(null);
@@ -20,7 +20,6 @@ export default function PublishingHQ() {
 
     const [newPost, setNewPost] = useState({ title: '', clientId: 'client_warda', category: 'social_post' as any, platform: 'Instagram', caption: '', hashtags: '', scheduledDate: '', scheduledTime: '', owner: 'ريم', notes: '' });
 
-    useEffect(() => { theme === 'dark' ? document.documentElement.classList.add('dark') : document.documentElement.classList.remove('dark'); }, [theme]);
     useEffect(() => { const t = store.getToast(); if (t.msg) { setToast(t.msg); setTimeout(() => setToast(''), 3000); } }, [ver, store]);
 
     const clients = cStore.clients;
@@ -86,8 +85,8 @@ export default function PublishingHQ() {
                     <div className={s.boardTitle}><div className={s.boardDot} /><h1 className={s.boardName}>{ar ? 'النشر' : 'Publishing'}</h1></div>
                 </div>
                 <div className={s.headerLeft}>
-                    <button className={s.iconBtn} onClick={() => setTheme(p => p === 'light' ? 'dark' : 'light')}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg></button>
-                    <button className={s.iconBtn} onClick={() => setLang(p => p === 'ar' ? 'en' : 'ar')}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></button>
+                    <button className={s.iconBtn} onClick={toggleTheme}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" /></svg></button>
+                    <button className={s.iconBtn} onClick={toggleLang}><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="2" y1="12" x2="22" y2="12" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg></button>
                     <div className={s.userAvatar}>م.خ</div>
                     <div className={s.headerDivider} />
                     <div className={s.navSwitcher}>

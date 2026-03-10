@@ -7,7 +7,7 @@ import { clientUpdateSchema } from '@/lib/validations';
 
 // GET — Single client
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requirePermission('view:clients');
+    const auth = await requirePermission('clients.view');
     if (auth.error) return auth.error;
 
     try {
@@ -30,7 +30,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 // PUT — Update
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requirePermission('manage:clients');
+    const auth = await requirePermission('clients.manage');
     if (auth.error) return auth.error;
 
     try {
@@ -60,7 +60,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 // DELETE — Archive (soft delete)
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
-    const auth = await requirePermission('manage:clients');
+    const auth = await requirePermission('clients.manage');
     if (auth.error) return auth.error;
 
     try {

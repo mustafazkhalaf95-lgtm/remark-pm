@@ -1,158 +1,268 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth';
+import { errorToResponse } from '@/lib/apiError';
 
-// POST /api/automations/seed — Seed Placker-based automation rules
-export async function POST(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+// ─── Seed data: sample automation rules for Remark PM ───
 
-    const userId = (session.user as any).id;
-    const wm = await prisma.workspaceMember.findFirst({ where: { userId } });
-    if (!wm) return NextResponse.json({ error: 'No workspace' }, { status: 400 });
+interface SeedRule {
+  key: string;
+  name: string;
+  nameAr: string;
+  description: string;
+  descriptionAr: string;
+  trigger: string;
+  triggerConfig: Record<string, string>;
+  actions: Array<Record<string, string>>;
+  enabled: boolean;
+}
 
-    const workspaceId = wm.workspaceId;
-
-    // Get boards for linking
-    const boards = await prisma.board.findMany({
-        where: { workspaceId },
-        include: { lists: { orderBy: { position: 'asc' } } },
-    });
-
-    const boardMap: Record<string, { id: string; lists: { id: string; name: string }[] }> = {};
-    boards.forEach(b => { boardMap[b.name.toLowerCase()] = { id: b.id, lists: b.lists }; });
-
-    // Get users for assignment
-    const members = await prisma.workspaceMember.findMany({
-        where: { workspaceId },
-        include: { user: true },
-    });
-
-    const userMap: Record<string, string> = {};
-    members.forEach(m => { userMap[m.user.name?.toLowerCase() || ''] = m.userId; });
-
-    // Get custom fields
-    const fields = await prisma.customField.findMany({ where: { workspaceId } });
-    const fieldMap: Record<string, string> = {};
-    fields.forEach(f => { fieldMap[f.name] = f.id; });
-
-    // ====== AUTOMATION RULES (No global mirrors — mirror rules are marketing-board-specific) ======
-
-    const rules = [
-        // 1. Task Assignment notification
+function getSampleRules(): SeedRule[] {
+  return [
+    // 1. When a marketing task moves to "approved", notify the team
+    {
+      key: 'automation_seed_marketing_approved',
+      name: 'Marketing Task Approved Notification',
+      nameAr: 'إشعار الموافقة على مهمة تسويق',
+      description: 'Sends a notification when a marketing task is approved',
+      descriptionAr: 'يرسل إشعارًا عند الموافقة على مهمة تسويقية',
+      trigger: 'status_change',
+      triggerConfig: {
+        boardType: 'marketing_task',
+        statusTo: 'approved',
+      },
+      actions: [
         {
-            name: 'توزيع مهام الإنتاج',
-            description: 'عند تعيين مهمة إنتاج يتم إرسال إشعار',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: {
-                fieldName: 'taskAssignment',
-            },
-            actions: [
-                { type: 'NOTIFY', title: '📋 مهمة إنتاج جديدة', body: 'تم تعيين مهمة إنتاج جديدة لك' },
-            ],
+          type: 'create_notification',
+          notificationTitle: 'Marketing Task Approved',
+          notificationTitleAr: 'تم اعتماد مهمة التسويق',
+          notificationMessage: 'A marketing task has been approved and is ready for creative execution.',
+          notificationMessageAr: 'تم اعتماد مهمة التسويق وهي جاهزة للتنفيذ الإبداعي.',
         },
+      ],
+      enabled: true,
+    },
 
-        // 2. Client approval notification
+    // 2. When a creative request is completed, log the activity
+    {
+      key: 'automation_seed_creative_completed',
+      name: 'Creative Request Completed Logger',
+      nameAr: 'تسجيل اكتمال الطلب الإبداعي',
+      description: 'Logs activity when a creative request reaches approved_ready status',
+      descriptionAr: 'يسجل النشاط عندما يصل الطلب الإبداعي إلى حالة الموافقة',
+      trigger: 'status_change',
+      triggerConfig: {
+        boardType: 'creative_request',
+        statusTo: 'approved_ready',
+      },
+      actions: [
+        { type: 'log_activity' },
         {
-            name: 'إشعار موافقة العميل',
-            description: 'عندما يتم تقييم البطاقة موافقة كلاينت يتم إرسال إشعار',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: {
-                fieldName: 'finalReview',
-                toValue: 'client_approved',
-            },
-            actions: [
-                { type: 'NOTIFY', title: '✅ موافقة العميل', body: 'تم قبول البطاقة' },
-            ],
+          type: 'create_notification',
+          notificationTitle: 'Creative Request Ready',
+          notificationTitleAr: 'الطلب الإبداعي جاهز',
+          notificationMessage: 'A creative request has been approved and is ready for production.',
+          notificationMessageAr: 'تم اعتماد الطلب الإبداعي وهو جاهز للإنتاج.',
         },
+      ],
+      enabled: true,
+    },
 
-        // 3. Management rejection notification
+    // 3. When a production job status changes to "in_production", notify
+    {
+      key: 'automation_seed_production_started',
+      name: 'Production Job Started Notification',
+      nameAr: 'إشعار بدء مهمة الإنتاج',
+      description: 'Notifies when a production job enters in_production phase',
+      descriptionAr: 'يرسل إشعارًا عندما تدخل مهمة الإنتاج مرحلة التنفيذ',
+      trigger: 'status_change',
+      triggerConfig: {
+        boardType: 'production_job',
+        statusTo: 'in_production',
+      },
+      actions: [
         {
-            name: 'إشعار رفض الإدارة',
-            description: 'عند رفض البطاقة من الإدارة يتم إرسال إشعار',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: {
-                fieldName: 'finalReview',
-                toValue: 'mgmt_rejected',
-            },
-            actions: [
-                { type: 'NOTIFY', title: '🔴 بطاقة مرفوضة', body: 'تم رفض البطاقة — يرجى المراجعة والتعديل' },
-            ],
+          type: 'create_notification',
+          notificationTitle: 'Production Started',
+          notificationTitleAr: 'بدأ الإنتاج',
+          notificationMessage: 'A production job has entered the production phase.',
+          notificationMessageAr: 'دخلت مهمة الإنتاج مرحلة التنفيذ.',
         },
+      ],
+      enabled: true,
+    },
 
-        // 4. Content type → Video → Set default phases
+    // 4. When a publishing item is published, log and notify
+    {
+      key: 'automation_seed_publishing_published',
+      name: 'Content Published Notification',
+      nameAr: 'إشعار نشر المحتوى',
+      description: 'Notifies and logs when content is published',
+      descriptionAr: 'يرسل إشعارًا ويسجل عند نشر المحتوى',
+      trigger: 'status_change',
+      triggerConfig: {
+        boardType: 'publishing_item',
+        statusTo: 'published',
+      },
+      actions: [
+        { type: 'log_activity' },
         {
-            name: 'مراحل إنتاج فيديو',
-            description: 'عند تعيين نوع المحتوى كفيديو، يتم إنشاء مراحل إنتاج الفيديو تلقائياً',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: {
-                fieldName: 'contentType',
-                toValue: 'video',
-            },
-            actions: [
-                {
-                    type: 'CREATE_PHASES', phases: [
-                        { phase: 'كتابة السكريبت', deadlineDays: 1 },
-                        { phase: 'تجهيز اللوكيشن', deadlineDays: 1 },
-                        { phase: 'التصوير', deadlineDays: 2 },
-                        { phase: 'المونتاج والتعديل', deadlineDays: 3 },
-                        { phase: 'المراجعة الداخلية', deadlineDays: 1 },
-                        { phase: 'مراجعة العميل', deadlineDays: 2 },
-                    ]
-                },
-                { type: 'SET_FIELD', fieldId: fieldMap['creativeState'], value: 'in_progress' },
-            ],
+          type: 'create_notification',
+          notificationTitle: 'Content Published!',
+          notificationTitleAr: 'تم نشر المحتوى!',
+          notificationMessage: 'Content has been successfully published.',
+          notificationMessageAr: 'تم نشر المحتوى بنجاح.',
         },
+      ],
+      enabled: true,
+    },
 
-        // 5. Content type → Design → Set default phases
+    // 5. When any task is created, log the creation
+    {
+      key: 'automation_seed_task_created_log',
+      name: 'New Task Activity Logger',
+      nameAr: 'تسجيل نشاط المهام الجديدة',
+      description: 'Logs activity whenever a new task is created in any board',
+      descriptionAr: 'يسجل النشاط عند إنشاء مهمة جديدة في أي لوحة',
+      trigger: 'task_created',
+      triggerConfig: {},
+      actions: [{ type: 'log_activity' }],
+      enabled: true,
+    },
+
+    // 6. Urgent priority notification
+    {
+      key: 'automation_seed_urgent_priority',
+      name: 'Urgent Priority Alert',
+      nameAr: 'تنبيه الأولوية العاجلة',
+      description: 'Sends notification when a task is set to urgent priority',
+      descriptionAr: 'يرسل إشعارًا عند تعيين مهمة بأولوية عاجلة',
+      trigger: 'priority_change',
+      triggerConfig: {
+        priority: 'urgent',
+      },
+      actions: [
         {
-            name: 'مراحل إنتاج تصميم',
-            description: 'عند تعيين نوع المحتوى كتصميم، يتم إنشاء مراحل إنتاج التصميم تلقائياً',
-            trigger: 'FIELD_CHANGE',
-            triggerConfig: {
-                fieldName: 'contentType',
-                toValue: 'design',
-            },
-            actions: [
-                {
-                    type: 'CREATE_PHASES', phases: [
-                        { phase: 'كتابة الكوبي', deadlineDays: 1 },
-                        { phase: 'التصميم', deadlineDays: 2 },
-                        { phase: 'المراجعة الداخلية', deadlineDays: 1 },
-                        { phase: 'مراجعة العميل', deadlineDays: 2 },
-                    ]
-                },
-                { type: 'SET_FIELD', fieldId: fieldMap['creativeState'], value: 'in_progress' },
-            ],
+          type: 'create_notification',
+          notificationTitle: 'Urgent Task Alert',
+          notificationTitleAr: 'تنبيه مهمة عاجلة',
+          notificationMessage: 'A task has been marked as urgent priority. Immediate attention required.',
+          notificationMessageAr: 'تم تعيين مهمة بأولوية عاجلة. يتطلب اهتمامًا فوريًا.',
         },
-    ];
+      ],
+      enabled: true,
+    },
 
-    // Clear old rules
-    await prisma.automationRule.deleteMany({ where: { workspaceId } });
+    // 7. Client approval notification (creative workflow)
+    {
+      key: 'automation_seed_client_approval',
+      name: 'Client Approval Notification',
+      nameAr: 'إشعار موافقة العميل',
+      description: 'Notifies when a creative request receives client approval',
+      descriptionAr: 'يرسل إشعارًا عند حصول الطلب الإبداعي على موافقة العميل',
+      trigger: 'field_change',
+      triggerConfig: {
+        boardType: 'creative_request',
+        field: 'finalApproved',
+        value: 'true',
+      },
+      actions: [
+        {
+          type: 'create_notification',
+          notificationTitle: 'Client Approved Creative',
+          notificationTitleAr: 'العميل وافق على الإبداعي',
+          notificationMessage: 'The client has approved the creative request. Ready for production.',
+          notificationMessageAr: 'وافق العميل على الطلب الإبداعي. جاهز للإنتاج.',
+        },
+        { type: 'log_activity' },
+      ],
+      enabled: true,
+    },
 
-    // Create new rules
-    const created: any[] = [];
-    for (const rule of rules) {
-        // Filter out actions with undefined boardIds
-        const validActions = rule.actions.filter(a => {
-            if (a.type === 'MIRROR' && !(a as any).boardId) return false;
-            return true;
-        });
+    // 8. Rejection notification
+    {
+      key: 'automation_seed_rejection_alert',
+      name: 'Creative Rejection Alert',
+      nameAr: 'تنبيه رفض الإبداعي',
+      description: 'Alerts the team when a creative request is blocked',
+      descriptionAr: 'ينبه الفريق عند حظر طلب إبداعي',
+      trigger: 'field_change',
+      triggerConfig: {
+        boardType: 'creative_request',
+        field: 'blocked',
+        value: 'true',
+      },
+      actions: [
+        {
+          type: 'create_notification',
+          notificationTitle: 'Creative Request Blocked',
+          notificationTitleAr: 'تم حظر الطلب الإبداعي',
+          notificationMessage: 'A creative request has been blocked. Please review and take action.',
+          notificationMessageAr: 'تم حظر طلب إبداعي. يرجى المراجعة واتخاذ إجراء.',
+        },
+      ],
+      enabled: true,
+    },
+  ];
+}
 
-        const r = await prisma.automationRule.create({
-            data: {
-                name: rule.name,
-                description: rule.description,
-                trigger: rule.trigger,
-                triggerConfig: JSON.stringify(rule.triggerConfig),
-                actions: JSON.stringify(validActions),
-                enabled: true,
-                workspaceId,
-            },
-        });
-        created.push(r);
+// POST /api/automations/seed — Seed sample automation rules
+export async function POST(request: NextRequest) {
+  const auth = await requireAuth();
+  if (auth.error) return auth.error;
+
+  try {
+    // Get the organization
+    const org = await prisma.organization.findFirst({ select: { id: true } });
+    if (!org) {
+      return NextResponse.json(
+        { error: 'لم يتم العثور على المنظمة', error_en: 'No organization found. Please seed the database first.' },
+        { status: 400 }
+      );
     }
 
-    return NextResponse.json({ success: true, count: created.length, rules: created });
+    const organizationId = org.id;
+
+    // Clear existing automation rules
+    await prisma.systemSetting.deleteMany({
+      where: { organizationId, category: 'automation' },
+    });
+
+    // Create new rules
+    const rules = getSampleRules();
+    const created: Array<{ id: string; name: string; key: string }> = [];
+
+    for (const rule of rules) {
+      const ruleValue = {
+        name: rule.name,
+        nameAr: rule.nameAr,
+        description: rule.description,
+        descriptionAr: rule.descriptionAr,
+        trigger: rule.trigger,
+        triggerConfig: rule.triggerConfig,
+        actions: rule.actions,
+        enabled: rule.enabled,
+      };
+
+      const setting = await prisma.systemSetting.create({
+        data: {
+          organizationId,
+          category: 'automation',
+          key: rule.key,
+          value: JSON.stringify(ruleValue),
+        },
+      });
+
+      created.push({ id: setting.id, name: rule.name, key: rule.key });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `تم إنشاء ${created.length} قاعدة أتمتة / Created ${created.length} automation rules`,
+      count: created.length,
+      rules: created,
+    });
+  } catch (error) {
+    return errorToResponse(error);
+  }
 }

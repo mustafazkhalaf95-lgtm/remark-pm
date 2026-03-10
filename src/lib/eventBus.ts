@@ -57,8 +57,23 @@ class EventBus {
 
     /**
      * Emit an event to all listeners. Errors are logged but don't propagate.
+     * Supports both (AppEvent) and (type, payload) signatures.
      */
-    async emit(event: AppEvent): Promise<void> {
+    async emit(eventOrType: AppEvent | string, payload?: Record<string, any>): Promise<void> {
+        let event: AppEvent;
+        if (typeof eventOrType === 'string') {
+            const [entityType] = eventOrType.split(':') as [AppEvent['entityType']];
+            event = {
+                type: eventOrType as EventType,
+                entityId: (payload as any)?.task?.id || (payload as any)?.request?.id || (payload as any)?.job?.id || (payload as any)?.item?.id || '',
+                entityType,
+                payload: payload || {},
+                timestamp: new Date(),
+                userId: (payload as any)?.userId,
+            };
+        } else {
+            event = eventOrType;
+        }
         const callbacks = this.listeners.get(event.type) || [];
         for (const cb of callbacks) {
             try {

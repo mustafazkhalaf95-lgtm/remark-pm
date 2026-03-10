@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useTransition, useRef, useCallback, useMemo } from "react";
 import Link from "next/link";
-import { getCreativeStore } from '@/lib/creativeStore';
 import { useSettings } from '@/lib/useSettings';
-import { TEAM } from '@/lib/teamStore';
+import { useUsers, useClients } from '@/lib/hooks';
+import { apiMutate } from '@/lib/hooks';
 import { texts } from '@/lib/texts';
 import styles from "./page.module.css";
 
@@ -31,6 +31,7 @@ export default function Home() {
   const [expanded, setExpanded] = useState(false);
   const [showTaskList, setShowTaskList] = useState(false);
   const { theme, lang, toggleTheme, toggleLang } = useSettings();
+  const { users: teamMembers } = useUsers();
   const [showWizard, setShowWizard] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [wizardData, setWizardData] = useState({
@@ -338,19 +339,21 @@ export default function Home() {
         } catch (e) { console.error('Phase 2 error:', e); setIsConverting(false); convertingRef.current = false; }
       }, 300);
 
-      // ── Phase 3 (2000ms): Creative store sync (delayed to avoid crash) ──
-      setTimeout(() => {
+      // ── Phase 3 (2000ms): Create creative requests via API ──
+      setTimeout(async () => {
         try {
-          const creativeStore = getCreativeStore();
-          creativeStore.batchStart();
-          try {
-            creativeStore.syncClient({ clientId: stableClientId, name: pcName, nameEn: pcName, sector: pcData.industry || '', sectorEn: pcData.industry || '', planType: pcData.planType || '', budget: pcData.budget || savedBudget || '', socialLinks: pcData.socialLinks || [], avatar: '✅', createdAt: new Date().toISOString().split('T')[0], linkedFromMarketing: true, marketingConvertedAt: new Date().toISOString(), marketingTaskCount: savedContentTypes.length, marketingTaskTitles: savedContentTypes });
-            for (const ct of savedContentTypes) {
-              creativeStore.createRequestFromMarketingTask(stableClientId, ct, `mkt_auto_${Date.now()}_${Math.random().toString(36).slice(2, 4)}`);
-            }
-          } catch (e: any) { console.error('Creative store sync error:', e); }
-          try { creativeStore.batchEnd(); } catch (e) { console.error('batchEnd error:', e); }
-        } catch (e) { console.error('Phase 3 error:', e); }
+          for (const ct of savedContentTypes) {
+            await apiMutate('/api/creative-requests', 'POST', {
+              clientId: stableClientId,
+              title: ct,
+              titleAr: ct,
+              category: 'social_post',
+              brief: `Auto-created from marketing conversion: ${ct}`,
+              status: 'new_request',
+              priority: 'medium',
+            });
+          }
+        } catch (e) { console.error('Phase 3 creative requests error:', e); }
       }, 2000);
     } catch (e) {
       console.error('handleConvertToClient error:', e);
@@ -395,11 +398,11 @@ export default function Home() {
           <div className={styles.accessGroup}>
             <div className={styles.avatarStack}>
               {boardViewers.slice(0, 4).map(vid => {
-                const member = TEAM.find((m: any) => m.id === vid);
+                const member = teamMembers.find((m: any) => m.id === vid);
                 if (!member) return null;
                 return (
-                  <div key={vid} className={styles.stackedAvatar} title={member.name} style={{ background: `linear-gradient(135deg, ${member.color}, ${member.color}88)` }}>
-                    {member.avatar}
+                  <div key={vid} className={styles.stackedAvatar} title={member.name || member.displayName} style={{ background: 'linear-gradient(135deg, #6366f1, #8b5cf688)' }}>
+                    {member.avatar || '👤'}
                   </div>
                 );
               })}
@@ -914,7 +917,7 @@ export default function Home() {
                       <div className={styles.smallProgressFill} style={{ width: '0%' }} />
                     </div>
                   </div>
-                  {cc.linkedClientId && (() => { try { const cs = getCreativeStore(); const cp = cs.getCreativeProgressForMarketing(cc.linkedClientId); if (cp.total > 0) return (<div style={{ display: 'flex', gap: 6, padding: '4px 12px 8px', flexWrap: 'wrap', alignItems: 'center' }}><span style={{ fontSize: 10, fontWeight: 600, color: '#8b5cf6', background: 'rgba(139,92,246,.08)', border: '1px solid rgba(139,92,246,.15)', borderRadius: 12, padding: '2px 8px' }}>🎨 {lang === 'ar' ? `${cp.active} نشط` : `${cp.active} Active`}</span>{cp.done > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#22c55e', background: 'rgba(34,197,94,.08)', border: '1px solid rgba(34,197,94,.15)', borderRadius: 12, padding: '2px 8px' }}>✅ {cp.done}</span>}{cp.blocked > 0 && <span style={{ fontSize: 10, fontWeight: 600, color: '#ef4444', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.15)', borderRadius: 12, padding: '2px 8px' }}>⛔ {cp.blocked}</span>}<Link href={`/creative/client/${cc.linkedClientId}`} onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#14b8a6', fontWeight: 600, textDecoration: 'none' }}>🎨→</Link></div>); return null; } catch { return null; } })()}
+                  {cc.linkedClientId && (<div style={{ display: 'flex', gap: 6, padding: '4px 12px 8px', flexWrap: 'wrap', alignItems: 'center' }}><Link href={`/creative/client/${cc.linkedClientId}`} onClick={e => e.stopPropagation()} style={{ fontSize: 10, color: '#8b5cf6', fontWeight: 600, textDecoration: 'none', background: 'rgba(139,92,246,.08)', border: '1px solid rgba(139,92,246,.15)', borderRadius: 12, padding: '2px 8px' }}>🎨 {lang === 'ar' ? 'عرض الإبداعي' : 'View Creative'} →</Link></div>)}
                 </div>
               )}
 
@@ -1916,17 +1919,17 @@ export default function Home() {
               <button onClick={() => setShowAddViewer(false)} style={{ width: 32, height: 32, borderRadius: 10, border: 'none', background: 'rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>✕</button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-              {TEAM.map((m: any) => {
+              {teamMembers.map((m: any) => {
                 const isViewer = boardViewers.includes(m.id);
                 return (
                   <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, marginBottom: 4, background: isViewer ? 'rgba(99,102,241,0.08)' : 'transparent', transition: 'all .2s', cursor: 'pointer' }} onClick={() => {
                     if (isViewer) setBoardViewers(prev => prev.filter(v => v !== m.id));
                     else setBoardViewers(prev => [...prev, m.id]);
                   }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(135deg, ${m.color}, ${m.color}88)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff', fontWeight: 800, flexShrink: 0 }}>{m.avatar}</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #6366f1, #8b5cf688)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff', fontWeight: 800, flexShrink: 0 }}>{m.avatar || '👤'}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary, #1e293b)' }}>{m.name}</div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary, #64748b)' }}>{m.position}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary, #1e293b)' }}>{lang === 'ar' ? (m.nameAr || m.name) : m.name}</div>
+                      <div style={{ fontSize: 12, color: 'var(--text-secondary, #64748b)' }}>{m.position || m.role}</div>
                     </div>
                     <button style={{ width: 36, height: 36, borderRadius: 10, border: 'none', background: isViewer ? 'rgba(239,68,68,0.1)' : 'rgba(99,102,241,0.1)', color: isViewer ? '#ef4444' : '#6366f1', cursor: 'pointer', fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, transition: 'all .2s' }} title={isViewer ? (lang === 'ar' ? 'إزالة' : 'Remove') : (lang === 'ar' ? 'إضافة' : 'Add')}>
                       {isViewer ? '−' : '+'}

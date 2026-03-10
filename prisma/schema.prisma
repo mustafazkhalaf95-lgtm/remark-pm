@@ -131,6 +131,18 @@ model User {
   productionAssignments   ProductionJob[]    @relation("ProductionAssignee")
   publishingReviews       PublishingItem[]   @relation("PublishingReviewer")
 
+  // New module relations
+  chatRoomMemberships ChatRoomMember[]
+  chatMessages        ChatMessage[]     @relation("ChatMessageSender")
+  timeEntries         TimeEntry[]       @relation("TimeEntries")
+  leaveRequests       LeaveRequest[]    @relation("LeaveRequests")
+  performanceReviews  PerformanceReview[] @relation("PerformanceReviews")
+  reviewsConducted    PerformanceReview[] @relation("ReviewsConducted")
+  wikiArticles        WikiArticle[]     @relation("WikiArticles")
+  contactLogs         ContactLog[]      @relation("ContactLogs")
+  calendarEvents      CalendarEvent[]   @relation("CalendarEvents")
+  calendarAttendees   CalendarAttendee[] @relation("CalendarAttendees")
+
   @@index([email])
   @@index([status])
 }
@@ -328,6 +340,13 @@ model Client {
   assets         Asset[]
   userClients    UserClient[]
   activities     ActivityLog[]
+
+  // New module relations
+  invoices          Invoice[]
+  portalAccess      ClientPortalAccess[]
+  clientFeedback    ClientFeedback[]
+  contactLogs       ContactLog[]
+  leadScore         LeadScore?
 
   @@index([status])
 }
@@ -598,4 +617,455 @@ model AuditLog {
   @@index([userId])
   @@index([category])
   @@index([createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CHAT & MESSAGING LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model ChatRoom {
+  id           String   @id @default(cuid())
+  name         String
+  nameAr       String   @default("")
+  type         String   @default("department") // company, department, client, direct, project
+  departmentId String?
+  clientId     String?
+  isArchived   Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages     ChatMessage[]
+  members      ChatRoomMember[]
+
+  @@index([type])
+}
+
+model ChatRoomMember {
+  id        String   @id @default(cuid())
+  roomId    String
+  userId    String
+  role      String   @default("member") // admin, member
+  joinedAt  DateTime @default(now())
+  lastReadAt DateTime?
+
+  room ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  user User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([roomId, userId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  roomId    String
+  senderId  String
+  content   String
+  type      String   @default("text") // text, system, ai_suggestion, card_reference
+  mentions  String   @default("[]") // JSON array of user IDs
+  replyToId String?
+  entityType String  @default("") // creative_request, production_job, etc.
+  entityId  String   @default("")
+  isEdited  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  room    ChatRoom     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  sender  User         @relation("ChatMessageSender", fields: [senderId], references: [id])
+  replyTo ChatMessage? @relation("ChatReplies", fields: [replyToId], references: [id])
+  replies ChatMessage[] @relation("ChatReplies")
+
+  @@index([roomId, createdAt])
+  @@index([senderId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FINANCIAL LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model Invoice {
+  id          String   @id @default(cuid())
+  number      String   @unique // INV-2026-001
+  clientId    String
+  campaignId  String?
+  status      String   @default("draft") // draft, sent, viewed, paid, overdue, cancelled
+  issueDate   DateTime @default(now())
+  dueDate     DateTime
+  subtotal    Float    @default(0)
+  taxRate     Float    @default(0)
+  taxAmount   Float    @default(0)
+  discount    Float    @default(0)
+  total       Float    @default(0)
+  currency    String   @default("USD")
+  notes       String   @default("")
+  notesAr     String   @default("")
+  paidAt      DateTime?
+  sentAt      DateTime?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client   Client    @relation(fields: [clientId], references: [id])
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model InvoiceItem {
+  id          String @id @default(cuid())
+  invoiceId   String
+  description String
+  descriptionAr String @default("")
+  quantity    Float  @default(1)
+  rate        Float  @default(0)
+  amount      Float  @default(0)
+  sortOrder   Int    @default(0)
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  amount      Float
+  method      String   @default("bank_transfer") // bank_transfer, cash, card, cheque, other
+  reference   String   @default("")
+  notes       String   @default("")
+  paidAt      DateTime @default(now())
+  recordedBy  String?
+  createdAt   DateTime @default(now())
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  category    String   // salaries, software, equipment, travel, marketing, office, freelancer, other
+  description String
+  descriptionAr String @default("")
+  amount      Float
+  currency    String   @default("USD")
+  date        DateTime @default(now())
+  receiptUrl  String   @default("")
+  clientId    String?
+  campaignId  String?
+  status      String   @default("pending") // pending, approved, rejected
+  approvedBy  String?
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([category])
+  @@index([status])
+  @@index([date])
+}
+
+model Budget {
+  id          String   @id @default(cuid())
+  clientId    String?
+  campaignId  String?
+  name        String
+  nameAr      String   @default("")
+  allocated   Float    @default(0)
+  spent       Float    @default(0)
+  period      String   @default("monthly") // monthly, quarterly, yearly, project
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String   @default("active") // active, closed, exceeded
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([campaignId])
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TIME TRACKING LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model TimeEntry {
+  id          String   @id @default(cuid())
+  userId      String
+  clientId    String?
+  taskType    String   @default("") // marketing_task, creative_request, production_job, publishing_item, general
+  taskId      String   @default("")
+  description String   @default("")
+  descriptionAr String @default("")
+  startTime   DateTime
+  endTime     DateTime?
+  duration    Int      @default(0) // in minutes
+  billable    Boolean  @default(true)
+  rate        Float    @default(0)
+  status      String   @default("running") // running, completed, edited
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation("TimeEntries", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([clientId])
+  @@index([startTime])
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FILE MANAGEMENT LAYER
+// ═══════════════════════════════════════════════════════════════
+
+model FileAttachment {
+  id          String   @id @default(cuid())
+  entityType  String   @default("") // creative_request, production_job, invoice, client, general
+  entityId    String   @default("")
+  fileName    String
+  fileUrl     String
+  fileSize    Int      @default(0) // bytes
+  mimeType    String   @default("")
+  folder      String   @default("general") // general, brand_assets, deliverables, documents, receipts
+  uploadedBy  String?
+  description String   @default("")
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([folder])
+  @@index([uploadedBy])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROJECT TIMELINE & MILESTONES
+// ═══════════════════════════════════════════════════════════════
+
+model ProjectMilestone {
+  id          String   @id @default(cuid())
+  campaignId  String?
+  clientId    String?
+  title       String
+  titleAr     String   @default("")
+  description String   @default("")
+  dueDate     DateTime
+  completedAt DateTime?
+  status      String   @default("pending") // pending, in_progress, completed, overdue
+  color       String   @default("#6366f1")
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([clientId])
+  @@index([status])
+  @@index([dueDate])
+}
+
+model TaskDependency {
+  id              String @id @default(cuid())
+  taskType        String // marketing_task, creative_request, production_job, publishing_item
+  taskId          String
+  dependsOnType   String
+  dependsOnId     String
+  dependencyType  String @default("finish_to_start") // finish_to_start, start_to_start, finish_to_finish
+  createdAt       DateTime @default(now())
+
+  @@unique([taskType, taskId, dependsOnType, dependsOnId])
+  @@index([taskType, taskId])
+  @@index([dependsOnType, dependsOnId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLIENT PORTAL
+// ═══════════════════════════════════════════════════════════════
+
+model ClientPortalAccess {
+  id          String   @id @default(cuid())
+  clientId    String
+  email       String
+  name        String   @default("")
+  tokenHash   String   @default("")
+  permissions String   @default("view") // view, approve, comment, files
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, email])
+  @@index([email])
+}
+
+model ClientFeedback {
+  id          String   @id @default(cuid())
+  clientId    String
+  portalAccessId String?
+  entityType  String   // creative_request, production_job, publishing_item, deliverable
+  entityId    String
+  content     String
+  rating      Int?     // 1-5
+  status      String   @default("new") // new, acknowledged, resolved
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([entityType, entityId])
+  @@index([status])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HR & RESOURCE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════
+
+model LeaveRequest {
+  id          String   @id @default(cuid())
+  userId      String
+  type        String   @default("annual") // annual, sick, personal, unpaid, remote
+  startDate   DateTime
+  endDate     DateTime
+  days        Float    @default(1)
+  reason      String   @default("")
+  status      String   @default("pending") // pending, approved, rejected, cancelled
+  approvedBy  String?
+  approvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation("LeaveRequests", fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([startDate])
+}
+
+model PerformanceReview {
+  id          String   @id @default(cuid())
+  userId      String
+  reviewerId  String
+  period      String   // Q1-2026, Q2-2026, etc.
+  rating      Int      @default(0) // 1-5
+  strengths   String   @default("")
+  improvements String  @default("")
+  goals       String   @default("")
+  status      String   @default("draft") // draft, submitted, acknowledged
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user     User @relation("PerformanceReviews", fields: [userId], references: [id])
+  reviewer User @relation("ReviewsConducted", fields: [reviewerId], references: [id])
+
+  @@index([userId])
+  @@index([reviewerId])
+  @@index([period])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// KNOWLEDGE BASE / WIKI
+// ═══════════════════════════════════════════════════════════════
+
+model WikiArticle {
+  id          String   @id @default(cuid())
+  title       String
+  titleAr     String   @default("")
+  slug        String   @unique
+  content     String   @default("")
+  contentAr   String   @default("")
+  category    String   @default("general") // general, process, template, onboarding, policy
+  tags        String   @default("[]") // JSON array
+  authorId    String
+  isPublished Boolean  @default(false)
+  viewCount   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  author User @relation("WikiArticles", fields: [authorId], references: [id])
+
+  @@index([category])
+  @@index([slug])
+  @@index([authorId])
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CRM ENHANCEMENTS
+// ═══════════════════════════════════════════════════════════════
+
+model ContactLog {
+  id          String   @id @default(cuid())
+  clientId    String
+  userId      String
+  type        String   @default("call") // call, email, meeting, whatsapp, visit, note
+  subject     String   @default("")
+  subjectAr   String   @default("")
+  notes       String   @default("")
+  outcome     String   @default("") // positive, neutral, negative, follow_up_needed
+  followUpDate DateTime?
+  duration    Int?     // minutes
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation("ContactLogs", fields: [userId], references: [id])
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([followUpDate])
+}
+
+model LeadScore {
+  id          String   @id @default(cuid())
+  clientId    String   @unique
+  score       Int      @default(0) // 0-100
+  engagement  Int      @default(0)
+  budget      Int      @default(0)
+  urgency     Int      @default(0)
+  fit         Int      @default(0)
+  lastCalculated DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CALENDAR & SCHEDULING
+// ═══════════════════════════════════════════════════════════════
+
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  title       String
+  titleAr     String   @default("")
+  description String   @default("")
+  type        String   @default("meeting") // meeting, deadline, shoot, review, reminder, holiday
+  startAt     DateTime
+  endAt       DateTime?
+  allDay      Boolean  @default(false)
+  location    String   @default("")
+  color       String   @default("#6366f1")
+  clientId    String?
+  campaignId  String?
+  createdBy   String
+  isRecurring Boolean  @default(false)
+  recurRule   String   @default("") // RRULE format
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  creator  User @relation("CalendarEvents", fields: [createdBy], references: [id])
+  attendees CalendarAttendee[]
+
+  @@index([startAt])
+  @@index([createdBy])
+  @@index([clientId])
+}
+
+model CalendarAttendee {
+  id        String @id @default(cuid())
+  eventId   String
+  userId    String
+  status    String @default("pending") // pending, accepted, declined, tentative
+
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User          @relation("CalendarAttendees", fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
 }

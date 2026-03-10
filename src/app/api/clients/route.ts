@@ -4,10 +4,11 @@ import prisma from '@/lib/prisma';
 import { errorToResponse } from '@/lib/apiError';
 import { validateBody, sendSuccess, sendPaginated, parsePagination, parseFilters, buildWhere, buildOrderBy } from '@/lib/routeHandlers';
 import { clientCreateSchema, clientUpdateSchema } from '@/lib/validations';
+import { provisionNewClient } from '@/lib/clientAutomation';
 
 // GET — List with pagination + filters
 export async function GET(req: Request) {
-    const auth = await requirePermission('view:clients');
+    const auth = await requirePermission('clients.view');
     if (auth.error) return auth.error;
 
     try {
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
 
 // POST — Create
 export async function POST(req: Request) {
-    const auth = await requirePermission('manage:clients');
+    const auth = await requirePermission('clients.manage');
     if (auth.error) return auth.error;
 
     try {
@@ -60,6 +61,16 @@ export async function POST(req: Request) {
             }
         });
         await logAudit(auth.session.user.id, 'created', 'clients', { id: item.id, name: item.name });
+
+        // Auto-provision linked resources for the new client
+        await provisionNewClient({
+            clientId: item.id,
+            clientName: item.name,
+            clientNameAr: item.nameAr,
+            accountManagerId: (data as any).accountManagerId || undefined,
+            createdByUserId: auth.session.user.id,
+        });
+
         return sendSuccess(item, 201);
     } catch (error) {
         return errorToResponse(error);

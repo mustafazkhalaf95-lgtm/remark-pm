@@ -9,8 +9,17 @@ const NAV_ITEMS = [
     { href: '/creative', label: 'الإبداعي', labelEn: 'Creative', icon: '🎨' },
     { href: '/production', label: 'البرودكشن', labelEn: 'Production', icon: '🎬' },
     { href: '/publishing', label: 'النشر', labelEn: 'Publishing', icon: '📢' },
+    { href: '/finance', label: 'المالية', labelEn: 'Finance', icon: '💰' },
+    { href: '/timesheet', label: 'الوقت', labelEn: 'Time', icon: '⏱️' },
+    { href: '/analytics', label: 'التحليلات', labelEn: 'Analytics', icon: '📈' },
+    { href: '/files', label: 'الملفات', labelEn: 'Files', icon: '📁' },
+    { href: '/timeline', label: 'الجدول', labelEn: 'Timeline', icon: '🗓️' },
+    { href: '/calendar', label: 'التقويم', labelEn: 'Calendar', icon: '📅' },
     { href: '/chat', label: 'المحادثات', labelEn: 'Chat', icon: '💬' },
+    { href: '/hr', label: 'HR', labelEn: 'HR', icon: '👥' },
+    { href: '/wiki', label: 'المعرفة', labelEn: 'Wiki', icon: '📚' },
     { href: '/automations', label: 'الأتمتة', labelEn: 'Automations', icon: '⚡' },
+    { href: '/portal', label: 'البوابة', labelEn: 'Portal', icon: '🌐' },
     { href: '/admin', label: 'الإدارة', labelEn: 'Admin', icon: '⚙️' },
 ];
 

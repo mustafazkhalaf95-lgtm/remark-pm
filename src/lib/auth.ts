@@ -41,8 +41,8 @@ async function getDevFallbackSession(): Promise<AuthSession | null> {
                 id: user.id,
                 email: user.email,
                 name: user.profile?.fullName || user.email,
-                role: 'CEO',
-                roles: ['CEO'],
+                role: 'ceo',
+                roles: ['ceo'],
                 permissions: ['*'],
                 departments: ['*'],
                 positionLevel: 4,
@@ -66,7 +66,7 @@ export async function getAuthSession(): Promise<AuthSession | null> {
             id: user.id || '',
             email: user.email || '',
             name: user.name || '',
-            role: user.role || 'MEMBER',
+            role: user.role || 'viewer',
             roles: user.roles || [],
             permissions: user.permissions || [],
             departments: user.departments || [],
@@ -136,7 +136,7 @@ export async function requirePermission(permissionCode: string): Promise<
     const { session } = result;
 
     // C-level users bypass permission checks
-    if (['CEO', 'COO', 'CTO'].includes(session.user.role)) {
+    if (['ceo', 'coo', 'admin'].includes(session.user.role)) {
         return { session };
     }
 
@@ -178,7 +178,7 @@ export async function requireDepartment(departmentId: string): Promise<
     const { session } = result;
 
     // C-level can access all departments
-    if (['CEO', 'COO', 'CTO'].includes(session.user.role)) {
+    if (['ceo', 'coo', 'admin'].includes(session.user.role)) {
         return { session };
     }
 

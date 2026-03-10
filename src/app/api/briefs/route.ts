@@ -1,62 +1,79 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { briefCreateSchema, parseBody } from '@/lib/validations';
 
-export async function GET(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
+// GET /api/briefs - List campaigns as "briefs" (brief model no longer exists)
+// Uses Campaign as the closest equivalent to the old Brief model.
+export async function GET(request: NextRequest) {
+  try {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
+    const clientId = searchParams.get('clientId');
 
-    const briefs = await prisma.brief.findMany({
-        where: status ? { status } : undefined,
-        orderBy: { createdAt: 'desc' },
-        include: {
-            createdBy: { select: { id: true, name: true, avatar: true, role: true } },
-            cards: {
-                include: {
-                    taskPhases: { include: { assignee: { select: { id: true, name: true } } } },
-                    list: { include: { board: { select: { id: true, name: true } } } },
-                    assignees: { include: { user: { select: { id: true, name: true } } } },
-                },
+    const campaigns = await prisma.campaign.findMany({
+      where: {
+        ...(status ? { status } : {}),
+        ...(clientId ? { clientId } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        client: { select: { id: true, name: true, nameAr: true } },
+        marketingTasks: {
+          include: {
+            assignee: {
+              select: { id: true, profile: { select: { fullName: true } } },
             },
+          },
         },
+        creativeRequests: {
+          include: {
+            conceptWriter: {
+              select: { id: true, profile: { select: { fullName: true } } },
+            },
+          },
+        },
+      },
     });
 
-    return NextResponse.json(briefs);
+    return NextResponse.json(campaigns);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    console.error('[Briefs GET]', error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
 
-export async function POST(request: Request) {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const userId = (session.user as any).id;
+// POST /api/briefs - Create a new campaign (acts as brief creation)
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { title, description, clientId, startDate, endDate, budget } = body;
 
-    try {
-        const body = await request.json();
-        const parsed = parseBody(briefCreateSchema, body);
-        if (!parsed.success) {
-            return NextResponse.json({ error: parsed.error }, { status: 400 });
-        }
-        const { title, content, clientBoard, contentType, publishDate } = parsed.data;
-
-        const brief = await prisma.brief.create({
-            data: {
-                title,
-                content,
-                clientBoard,
-                contentType: contentType || 'VIDEO',
-                publishDate: new Date(publishDate),
-                createdById: userId,
-            },
-            include: { createdBy: { select: { id: true, name: true } } },
-        });
-
-        return NextResponse.json(brief);
-    } catch (error: any) {
-        console.error('[Briefs POST]', error);
-        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    if (!title || !clientId) {
+      return NextResponse.json(
+        { error: 'title and clientId are required' },
+        { status: 400 }
+      );
     }
+
+    const campaign = await prisma.campaign.create({
+      data: {
+        name: title,
+        description: description || '',
+        clientId,
+        status: 'planning',
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        budget: budget || '',
+      },
+      include: {
+        client: { select: { id: true, name: true, nameAr: true } },
+      },
+    });
+
+    return NextResponse.json(campaign, { status: 201 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal server error';
+    console.error('[Briefs POST]', error);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

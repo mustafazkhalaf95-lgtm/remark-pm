@@ -1,47 +1,52 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 
-async function requireSuperAdmin() {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) return null;
-    const role = (session.user as any).role;
-    if (role !== 'CEO') return null;
-    return session;
-}
-
-// GET — List all users
+// GET — List all users with profiles and roles
 export async function GET() {
-    const session = await requireSuperAdmin();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    try {
+        const users = await prisma.user.findMany({
+            include: {
+                profile: { include: { position: true } },
+                userRoles: { include: { role: true } },
+                userDepartments: { include: { department: true } },
+            },
+            orderBy: { createdAt: 'asc' },
+        });
 
-    const users = await prisma.user.findMany({
-        select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            createdAt: true,
-            enabled: true,
-            image: true,
-        },
-        orderBy: { createdAt: 'asc' },
-    });
+        const mapped = users.map(u => ({
+            id: u.id,
+            email: u.email,
+            status: u.status,
+            createdAt: u.createdAt,
+            lastLoginAt: u.lastLoginAt,
+            name: u.profile?.fullName || u.email,
+            nameAr: u.profile?.fullNameAr || '',
+            displayName: u.profile?.displayName || '',
+            avatar: u.profile?.avatar || '',
+            employeeCode: u.profile?.employeeCode || '',
+            position: u.profile?.position?.title || '',
+            positionAr: u.profile?.position?.titleAr || '',
+            role: u.userRoles.find(r => r.isPrimary)?.role?.name || 'staff',
+            roleAr: u.userRoles.find(r => r.isPrimary)?.role?.nameAr || 'موظف',
+            department: u.userDepartments.find(d => d.isPrimary)?.department?.name || '',
+            departmentAr: u.userDepartments.find(d => d.isPrimary)?.department?.nameAr || '',
+        }));
 
-    return NextResponse.json(users);
+        return NextResponse.json(mapped);
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 500 });
+    }
 }
 
 // POST — Create a new user
-export async function POST(request: Request) {
-    const session = await requireSuperAdmin();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-
+export async function POST(request: NextRequest) {
     try {
-        const { name, email, password, role } = await request.json();
-        if (!name || !email || !password || !role) {
-            return NextResponse.json({ error: 'جميع الحقول مطلوبة' }, { status: 400 });
+        const body = await request.json();
+        const { email, password, fullName, fullNameAr, displayName, roleName, departmentSlug } = body;
+
+        if (!email || !password || !fullName) {
+            return NextResponse.json({ error: 'البريد والكلمة السرية والاسم مطلوبة' }, { status: 400 });
         }
 
         const existing = await prisma.user.findUnique({ where: { email } });
@@ -51,57 +56,76 @@ export async function POST(request: Request) {
 
         const passwordHash = await bcrypt.hash(password, 12);
         const user = await prisma.user.create({
-            data: { name, email, password: passwordHash, role },
-            select: { id: true, name: true, email: true, role: true, createdAt: true, enabled: true },
+            data: { email, password: passwordHash, status: 'active' },
         });
 
-        return NextResponse.json(user, { status: 201 });
+        // Create profile
+        await prisma.userProfile.create({
+            data: {
+                userId: user.id,
+                fullName,
+                fullNameAr: fullNameAr || '',
+                displayName: displayName || fullName,
+            },
+        });
+
+        // Assign role
+        if (roleName) {
+            const role = await prisma.role.findFirst({ where: { name: roleName } });
+            if (role) {
+                await prisma.userRole.create({ data: { userId: user.id, roleId: role.id, isPrimary: true } });
+            }
+        }
+
+        // Assign department
+        if (departmentSlug) {
+            const dept = await prisma.department.findUnique({ where: { slug: departmentSlug } });
+            if (dept) {
+                await prisma.userDepartment.create({ data: { userId: user.id, departmentId: dept.id, isPrimary: true } });
+            }
+        }
+
+        return NextResponse.json({ id: user.id, email: user.email }, { status: 201 });
     } catch (e: any) {
         return NextResponse.json({ error: e.message || 'خطأ في إنشاء المستخدم' }, { status: 500 });
     }
 }
 
 // PUT — Update a user
-export async function PUT(request: Request) {
-    const session = await requireSuperAdmin();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-
+export async function PUT(request: NextRequest) {
     try {
-        const { id, name, email, role, enabled, password } = await request.json();
+        const body = await request.json();
+        const { id, email, status, password, fullName, fullNameAr, displayName } = body;
         if (!id) return NextResponse.json({ error: 'معرّف المستخدم مطلوب' }, { status: 400 });
 
-        const data: any = {};
-        if (name !== undefined) data.name = name;
-        if (email !== undefined) data.email = email;
-        if (role !== undefined) data.role = role;
-        if (enabled !== undefined) data.enabled = enabled;
-        if (password) data.password = await bcrypt.hash(password, 12);
+        const userData: any = {};
+        if (email !== undefined) userData.email = email;
+        if (status !== undefined) userData.status = status;
+        if (password) userData.password = await bcrypt.hash(password, 12);
 
-        const user = await prisma.user.update({
-            where: { id },
-            data,
-            select: { id: true, name: true, email: true, role: true, createdAt: true, enabled: true },
-        });
+        await prisma.user.update({ where: { id }, data: userData });
 
-        return NextResponse.json(user);
+        // Update profile if provided
+        if (fullName || fullNameAr || displayName) {
+            const profileData: any = {};
+            if (fullName) profileData.fullName = fullName;
+            if (fullNameAr) profileData.fullNameAr = fullNameAr;
+            if (displayName) profileData.displayName = displayName;
+            await prisma.userProfile.updateMany({ where: { userId: id }, data: profileData });
+        }
+
+        return NextResponse.json({ success: true });
     } catch (e: any) {
         return NextResponse.json({ error: e.message || 'خطأ في تحديث المستخدم' }, { status: 500 });
     }
 }
 
 // DELETE — Remove a user
-export async function DELETE(request: Request) {
-    const session = await requireSuperAdmin();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
-
+export async function DELETE(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
         if (!id) return NextResponse.json({ error: 'معرّف المستخدم مطلوب' }, { status: 400 });
-
-        if ((session.user as any).id === id) {
-            return NextResponse.json({ error: 'لا يمكنك حذف حسابك الشخصي' }, { status: 400 });
-        }
 
         await prisma.user.delete({ where: { id } });
         return NextResponse.json({ success: true });

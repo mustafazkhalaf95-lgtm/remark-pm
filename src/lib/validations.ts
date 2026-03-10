@@ -380,12 +380,14 @@ export const briefCreateSchema = z.object({
 });
 
 export const automationCreateSchema = z.object({
-    name: z.string().min(1, 'Name is required'),
-    description: z.string().optional(),
-    trigger: z.string().min(1, 'Trigger is required'),
-    triggerConfig: z.string().optional(),
-    actions: z.string().optional(),
-    workspaceId: z.string().min(1, 'Workspace ID is required'),
+    name: z.string().min(1, 'الاسم مطلوب / Name is required'),
+    nameAr: optionalString,
+    description: z.string().optional().default(''),
+    descriptionAr: optionalString,
+    trigger: z.string().min(1, 'المشغل مطلوب / Trigger is required'),
+    triggerConfig: z.record(z.string(), z.unknown()).optional().default({}),
+    actions: z.array(z.record(z.string(), z.unknown())).optional().default([]),
+    enabled: z.boolean().optional().default(true),
 });
 
 export const channelCreateSchema = z.object({
@@ -407,12 +409,15 @@ export const adminQuerySchema = z.object({
 });
 
 export const automationExecuteSchema = z.object({
-    trigger: z.string().min(1, 'Trigger is required'),
-    cardId: z.string().min(1, 'Card ID is required'),
-    fieldName: z.string().optional(),
-    oldValue: z.string().optional(),
-    newValue: z.string().optional(),
-    workspaceId: z.string().min(1, 'Workspace ID is required'),
+    trigger: z.string().min(1, 'المشغل مطلوب / Trigger is required'),
+    taskId: z.string().min(1, 'معرف المهمة مطلوب / Task ID is required'),
+    boardType: z.enum(['marketing_task', 'creative_request', 'production_job', 'publishing_item'], {
+        errorMap: () => ({ message: 'نوع اللوحة غير صالح / Invalid board type' }),
+    }),
+    statusFrom: z.string().optional(),
+    statusTo: z.string().optional(),
+    field: z.string().optional(),
+    value: z.string().optional(),
 });
 
 // ─── Helper: parse and return 400 on failure ───

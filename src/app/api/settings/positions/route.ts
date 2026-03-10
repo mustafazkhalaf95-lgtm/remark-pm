@@ -3,7 +3,7 @@ import prisma from '@/lib/prisma';
 import { requireRole, logAudit } from '@/lib/auth';
 
 export async function GET() {
-    const auth = await requireRole(['CEO', 'COO', 'HR_MANAGER']);
+    const auth = await requireRole(['ceo', 'coo', 'admin']);
     if (auth.error) return auth.error;
 
     try {
@@ -13,7 +13,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-    const auth = await requireRole(['CEO', 'COO', 'HR_MANAGER']);
+    const auth = await requireRole(['ceo', 'coo', 'admin']);
     if (auth.error) return auth.error;
 
     try {
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-    const auth = await requireRole(['CEO', 'COO', 'HR_MANAGER']);
+    const auth = await requireRole(['ceo', 'coo', 'admin']);
     if (auth.error) return auth.error;
 
     try {
@@ -42,7 +42,7 @@ export async function PUT(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-    const auth = await requireRole(['CEO', 'COO', 'HR_MANAGER']);
+    const auth = await requireRole(['ceo', 'coo', 'admin']);
     if (auth.error) return auth.error;
 
     try {

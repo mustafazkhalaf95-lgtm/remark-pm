@@ -5,7 +5,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
-  output: 'standalone',
   env: {
     NEXT_PUBLIC_BASE_PATH: '/work/workflow',
   },
